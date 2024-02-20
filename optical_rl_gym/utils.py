@@ -119,7 +119,7 @@ def evaluate_heuristic(
         episode_length = 0
         while not done:
             action = heuristic(env)
-            _, reward, done, _ = env.step(action)
+            _, reward, done, _,  _ = env.step(action)
             episode_reward += reward
             if callback is not None:
                 callback(locals(), globals())

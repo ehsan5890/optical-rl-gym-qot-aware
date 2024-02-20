@@ -5,6 +5,7 @@ import pickle
 import gym
 import matplotlib.pyplot as plt
 import numpy as np
+from stable_baselines3.common.monitor import Monitor
 from scipy.io import loadmat
 from optical_rl_gym.envs.phy_rmsa_env import (
     shortest_available_path_first_fit,
@@ -20,11 +21,15 @@ load = 1300
 # logging.getLogger("rmsaenv").setLevel(logging.INFO)
 
 seed = 20
-episodes = 1
-episode_length = 100000
+episodes = 10
+episode_length = 20
 
 monitor_files = []
 policies = []
+
+logging_dir = "../examples/phy_frag_rmsa"
+os.makedirs(logging_dir, exist_ok=True)
+
 
 # topology_name = 'gbn'
 # topology_name = 'nobel-us'
@@ -63,8 +68,13 @@ env_args = dict(
 
 print("STR".ljust(5), "REW".rjust(7), "STD".rjust(7))
 
-
+log_dir = f'{logging_dir}/logs_{load}_{episode_length}/'
+os.makedirs(log_dir, exist_ok=True)
 env_phy_df = gym.make("PhyRMSA-v0", **env_args)
+env_phy_df = Monitor(env_phy_df, log_dir + 'SAP-FF', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
+                                                                                         'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
+                                                                                         'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length'))
+
 mean_reward_sp, std_reward_sp = evaluate_heuristic(
     env_phy_df, phy_aware_sapff_rmsa, n_eval_episodes=episodes
 )
@@ -80,7 +90,16 @@ print(
     / env_phy_df.episode_services_processed,
 )
 
+
+
+
+
+
+
 env_phy_bmff_df = gym.make("PhyRMSA-v0", **env_args)
+env_phy_bmff_df = Monitor(env_phy_bmff_df, log_dir + 'BM-SA-FF', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
+                                                                                         'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
+                                                                                         'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length'))
 mean_reward_sp, std_reward_sp = evaluate_heuristic(
     env_phy_bmff_df, phy_aware_bmff_rmsa, n_eval_episodes=episodes
 )
@@ -97,24 +116,38 @@ print(
 )
 
 
-env_phy_bmfa_df = gym.make("PhyRMSA-v0", **env_args)
+
+
+
+env_phy_bmfa_cut_df = gym.make("PhyRMSA-v0", **env_args)
+env_phy_bmfa_cut_df = Monitor(env_phy_bmfa_cut_df, log_dir + 'BM-FA-Cut', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
+                                                                                         'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
+                                                                                         'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length'))
 mean_reward_sp, std_reward_sp = evaluate_heuristic(
-    env_phy_bmfa_df, phy_aware_bmfa_rmsa, n_eval_episodes=episodes
+    env_phy_bmfa_cut_df, phy_aware_bmfa_rmsa, n_eval_episodes=episodes
 )
 print("BM-FA:".ljust(8), f"{mean_reward_sp:.4f}  {std_reward_sp:<7.4f}")
 print(
     "\tBit rate blocking:",
-    (env_phy_bmfa_df.episode_bit_rate_requested - env_phy_bmfa_df.episode_bit_rate_provisioned)
-    / env_phy_bmfa_df.episode_bit_rate_requested,
+    (env_phy_bmfa_cut_df.episode_bit_rate_requested - env_phy_bmfa_cut_df.episode_bit_rate_provisioned)
+    / env_phy_bmfa_cut_df.episode_bit_rate_requested,
 )
 print(
     "\tRequest blocking:",
-    (env_phy_bmfa_df.episode_services_processed - env_phy_bmfa_df.episode_services_accepted)
-    / env_phy_bmfa_df.episode_services_processed,
+    (env_phy_bmfa_cut_df.episode_services_processed - env_phy_bmfa_cut_df.episode_services_accepted)
+    / env_phy_bmfa_cut_df.episode_services_processed,
 )
 
 
+
+
+
+
 env_phy_bmfa_rss_df = gym.make("PhyRMSA-v0", **env_args)
+
+env_phy_bmfa_rss_df = Monitor(env_phy_bmfa_rss_df, log_dir + 'BM-FA-RSS', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
+                                                                                         'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
+                                                                                         'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length'))
 mean_reward_sp, std_reward_sp = evaluate_heuristic(
     env_phy_bmfa_rss_df, phy_aware_bmfa_rss_rmsa, n_eval_episodes=episodes
 )

@@ -90,6 +90,10 @@ class PhyRMSAEnv(OpticalNetworkEnv):
         self.connections_detail = connections_detail
         self.gsnr = gsnr
 
+        self.number_cuts = 0
+        self.rss_total_metric = 0
+        self.total_path_length = 0
+
 
         # setting up bit rate selection
         self.bit_rate_selection = bit_rate_selection
@@ -131,7 +135,7 @@ class PhyRMSAEnv(OpticalNetworkEnv):
         self.grooming_layer = np.zeros(
             (self.topology.number_of_nodes(), self.topology.number_of_nodes()), dtype=int
         )
-## here 0: BVTs in C band, 1: BVTs in L band, 2: BVTs in S band
+## here 1: BVTs in C band, 0: BVTs in L band, 2: BVTs in S band
         self.bvts = np.zeros(
             (3, self.topology.number_of_nodes(), self.topology.number_of_nodes()), dtype=int
         )
@@ -272,6 +276,13 @@ class PhyRMSAEnv(OpticalNetworkEnv):
         #     self._get_network_compactness()
         # )  # measuring compactness after the provisioning
 
+        self.number_cuts = self._calculate_total_cuts()
+        self.rss_total_metric = self.calculate_total_r_spatial()
+        self.total_path_length = 0
+        for service in self.topology.graph["running_services"]:
+            self.total_path_length += service.path.length
+
+
         reward = self.reward()
         info = {
             "service_blocking_rate": (self.services_processed - self.services_accepted)
@@ -288,6 +299,12 @@ class PhyRMSAEnv(OpticalNetworkEnv):
                 self.episode_bit_rate_requested - self.episode_bit_rate_provisioned
             )
             / self.episode_bit_rate_requested,
+            "number_cuts_total": self.number_cuts,
+            "rss_total_metric": self.rss_total_metric,
+            "C_BVTs": np.sum(self.bvts[1])/(self.services_accepted+1),
+            "L_BVTs": np.sum(self.bvts[0])/(self.services_accepted+1),
+            "S_BVTs": np.sum(self.bvts[2])/(self.services_accepted+1),
+            "total_path_length": self.total_path_length
         }
 
         self._new_service = False
@@ -298,6 +315,7 @@ class PhyRMSAEnv(OpticalNetworkEnv):
             self.observation(),
             reward,
             self.episode_services_processed == self.episode_length,
+            False,
             info,
         )
 
@@ -742,9 +760,18 @@ class PhyRMSAEnv(OpticalNetworkEnv):
                     np.sum(lengths_after[unused_blocks_after]) + 1)  # added to one to avoid infinity?
         return r_spatial_after - r_spatial
 
+    def calculate_total_r_spatial(self):
+        r_spatial = 0
+        for channel_number in range(
+                self.num_spectrum_channels + self.num_spectrum_channels + self.number_spectrum_channels_s_band):  # c + L + S band
+            initial_indices, values, lengths = \
+                RMSAEnv.rle(self.topology.graph['available_channels'][:, channel_number])
+            unused_blocks = [i for i, x in enumerate(values) if x == 1]
+            r_spatial += np.sqrt(np.sum(lengths[unused_blocks] ** 2)) /(np.sum(lengths[unused_blocks])+1) # added to one to avoid infinity?
+
+        return r_spatial/(self.num_spectrum_channels + self.num_spectrum_channels + self.number_spectrum_channels_s_band)
 
     def calculate_r_cut(self, channel_number, link_indexes):
-        r_spatial = 0
         initial_indices, values, lengths = \
             RMSAEnv.rle(self.topology.graph['available_channels'][:, channel_number])
         temporary_channels = copy.deepcopy(self.topology.graph['available_channels'][:, channel_number])
@@ -753,6 +780,15 @@ class PhyRMSAEnv(OpticalNetworkEnv):
         initial_indices_after, values_after, lengths_after = \
             RMSAEnv.rle(temporary_channels)
         return np.sum(values) - np.sum(values_after)
+
+
+    def _calculate_total_cuts(self):
+        number_cut = 0
+        for channel_number in range(self.num_spectrum_channels + self.num_spectrum_channels + self.number_spectrum_channels_s_band): # c + L + S band
+            initial_indices, values, lengths = \
+                RMSAEnv.rle(self.topology.graph['available_channels'][:, channel_number])
+            number_cut +=np.sum(values)
+        return number_cut/(self.num_spectrum_channels + self.num_spectrum_channels + self.number_spectrum_channels_s_band)
 
     def _get_network_compactness(self):
         # implementing network spectrum compactness from https://ieeexplore.ieee.org/abstract/document/6476152
@@ -800,6 +836,9 @@ class PhyRMSAEnv(OpticalNetworkEnv):
             cur_spectrum_compactness = 1.0
 
         return cur_spectrum_compactness
+
+
+
 
 def phy_aware_sapff_rmsa(env: PhyRMSAEnv) -> Tuple[int, list]:
 # first to check if we have enough resource in virtual layer
