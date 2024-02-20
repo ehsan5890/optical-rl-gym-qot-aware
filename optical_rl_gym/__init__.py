@@ -24,3 +24,8 @@ register(
     id="RMCSA-v0",
     entry_point="optical_rl_gym.envs:RMCSAEnv",
 )
+
+register(
+    id="PhyRMSA-v0",
+    entry_point="optical_rl_gym.envs:PhyRMSAEnv",
+)

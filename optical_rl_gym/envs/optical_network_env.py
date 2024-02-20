@@ -22,6 +22,10 @@ class OpticalNetworkEnv(gym.Env):
         node_request_probabilities: Optional[np.array] = None,
         seed: Optional[int] = None,
         channel_width: float = 12.5,
+        number_spectrum_channels: int = 80,
+        number_spectrum_channels_s_band: int = 108,
+        l_band: bool = True,
+        s_band: bool = True,
     ):
         assert topology is None or "ksp" in topology.graph
         assert topology is None or "k_paths" in topology.graph
@@ -46,6 +50,11 @@ class OpticalNetworkEnv(gym.Env):
         self.rng: random.Random = None
         self.seed(seed=seed)
 
+        self._l_band = l_band
+        self._s_band = s_band
+        self.num_spectrum_channels = number_spectrum_channels
+        self.number_spectrum_channels_s_band = number_spectrum_channels_s_band
+
         self.topology: nx.Graph = copy.deepcopy(topology)
         self.topology_name: str = topology.graph["name"]
         self.k_paths: int = self.topology.graph["k_paths"]
@@ -65,6 +74,32 @@ class OpticalNetworkEnv(gym.Env):
             fill_value=self.num_spectrum_resources,
             dtype=int,
         )
+
+        if self._s_band:
+            self.topology.graph["available_all_channels"] = np.full(
+                self.topology.number_of_edges(),
+                fill_value=2*self.num_spectrum_channels + self.number_spectrum_channels_s_band,
+                dtype=int,
+            )
+            self.topology.graph["num_channel_resources"] = 2*self.num_spectrum_channels + self.number_spectrum_channels_s_band
+
+        else:
+            if self._l_band:
+                self.topology.graph["available_all_channels"] = np.full(
+                    self.topology.number_of_edges(),
+                    fill_value=2 * self.num_spectrum_channels,
+                    dtype=int,
+                )
+                self.topology.graph[
+                    "num_channel_resources"] = 2 * self.num_spectrum_channels
+            else:
+                self.topology.graph["available_all_channels"] = np.full(
+                    self.topology.number_of_edges(),
+                    fill_value=self.num_spectrum_channels,
+                    dtype=int,
+                )
+                self.topology.graph[
+                    "num_channel_resources"] = self.num_spectrum_channels
         if node_request_probabilities is not None:
             self.node_request_probabilities = node_request_probabilities
         else:
@@ -173,7 +208,7 @@ class OpticalNetworkEnv(gym.Env):
         return src, src_id, dst, dst_id
 
     def observation(self):
-        return {"topology": self.topology, "service": self.current_service}
+        return {"topology": self.topology, "current_service": self.current_service}
 
     def reward(self):
         return 1 if self.current_service.accepted else 0
@@ -191,6 +226,32 @@ class OpticalNetworkEnv(gym.Env):
             fill_value=self.num_spectrum_resources,
             dtype=int,
         )
+
+        if self._s_band:
+            self.topology.graph["available_all_channels"] = np.full(
+                self.topology.number_of_edges(),
+                fill_value=2*self.num_spectrum_channels + self.number_spectrum_channels_s_band,
+                dtype=int,
+            )
+            self.topology.graph["num_channel_resources"] = 2*self.num_spectrum_channels + self.number_spectrum_channels_s_band
+
+        else:
+            if self._l_band:
+                self.topology.graph["available_all_channels"] = np.full(
+                    self.topology.number_of_edges(),
+                    fill_value=2 * self.num_spectrum_channels,
+                    dtype=int,
+                )
+                self.topology.graph[
+                    "num_channel_resources"] = 2 * self.num_spectrum_channels
+            else:
+                self.topology.graph["available_all_channels"] = np.full(
+                    self.topology.number_of_edges(),
+                    fill_value=self.num_spectrum_channels,
+                    dtype=int,
+                )
+                self.topology.graph[
+                    "num_channel_resources"] = self.num_spectrum_channels
 
         self.topology.graph["services"] = []
         self.topology.graph["running_services"] = []

@@ -150,7 +150,8 @@ def get_topology(file_name, topology_name, modulations, k_paths=5):
 if __name__ == "__main__":
     # default values
     k_paths = 5
-    topology_file = "nsfnet_chen.txt"
+    # topology_file = "nsfnet_chen.txt"
+    topology_file = './topologies/jpn12.txt'
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -170,7 +171,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     topology_path = pathlib.Path(args.topology)
-
+    # topology_path = './topologies/Coronet.txt'
     topology = get_topology(
         args.topology, topology_path.stem.upper(), modulations, args.k_paths
     )

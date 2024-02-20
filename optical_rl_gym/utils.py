@@ -48,9 +48,11 @@ class Service:
     best_modulation: Optional[Modulation] = field(default=None)
     service_class: Optional[int] = field(default=None)
     number_slots: Optional[int] = field(default=None)
+    channels: Optional[list] = field(default=None)
     core: Optional[int] = field(default=None)
     launch_power: Optional[float] = field(default=None)
     accepted: bool = field(default=False)
+    virtual_layer: bool = field(default=False)
 
     def __str__(self):
         msg = "{"

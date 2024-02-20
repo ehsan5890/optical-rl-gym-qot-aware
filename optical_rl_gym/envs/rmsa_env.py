@@ -33,8 +33,9 @@ class RMSAEnv(OpticalNetworkEnv):
         load: float = 10,
         mean_service_holding_time: float = 10800.0,
         num_spectrum_resources: int = 100,
-        bit_rate_selection: str = "continuous",
-        bit_rates: Sequence = [10, 40, 100],
+        bit_rate_selection: str = "discrete",
+        bit_rates: Sequence = [ 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700,
+                                750, 800, 850, 900, 950, 1000, 1050, 1100, 1150, 1200],
         bit_rate_probabilities: Optional[np.array] = None,
         node_request_probabilities: Optional[np.array] = None,
         bit_rate_lower_bound: float = 25.0,
@@ -43,6 +44,12 @@ class RMSAEnv(OpticalNetworkEnv):
         allow_rejection: bool = False,
         reset: bool = True,
         channel_width: float = 12.5,
+        number_spectrum_channels: int = 80,
+        number_spectrum_channels_s_band: int = 108,
+        l_band: bool = True,
+        s_band: bool = True,
+        modulation_level: Optional[np.array] = None,
+        connections_detail: Optional[np.array] = None,
     ):
         super().__init__(
             topology,
@@ -54,6 +61,10 @@ class RMSAEnv(OpticalNetworkEnv):
             seed=seed,
             allow_rejection=allow_rejection,
             channel_width=channel_width,
+            number_spectrum_channels=number_spectrum_channels,
+            number_spectrum_channels_s_band=number_spectrum_channels_s_band,
+            l_band=l_band,
+            s_band=s_band,
         )
 
         # make sure that modulations are set in the topology
@@ -74,6 +85,10 @@ class RMSAEnv(OpticalNetworkEnv):
         self.bit_rate_provisioned = 0
         self.episode_bit_rate_requested = 0
         self.episode_bit_rate_provisioned = 0
+        self.modulation_level = modulation_level
+        self.connections_detail = connections_detail
+        self.gsnr = gsnr
+
 
         # setting up bit rate selection
         self.bit_rate_selection = bit_rate_selection
@@ -112,12 +127,56 @@ class RMSAEnv(OpticalNetworkEnv):
         self.spectrum_usage = np.zeros(
             (self.topology.number_of_edges(), self.num_spectrum_resources), dtype=int
         )
+        self.grooming_layer = np.zeros(
+            (self.topology.number_of_nodes(), self.topology.number_of_nodes()), dtype=int
+        )
+## here 0: BVTs in C band, 1: BVTs in L band, 2: BVTs in S band
+        self.bvts = np.zeros(
+            (3, self.topology.number_of_nodes(), self.topology.number_of_nodes()), dtype=int
+        )
 
         self.spectrum_slots_allocation = np.full(
             (self.topology.number_of_edges(), self.num_spectrum_resources),
             fill_value=-1,
             dtype=int,
         )
+
+        if self._s_band:
+            self.spectrum_channels_allocation = np.full(
+                (self.topology.number_of_edges(), 2*self.num_spectrum_channels + self.number_spectrum_channels_s_band),
+                fill_value=-1,
+                dtype=int,
+            )
+            self.topology.graph["available_channels"] = np.ones(
+                (self.topology.number_of_edges(),
+                2*self.num_spectrum_channels + self.number_spectrum_channels_s_band),
+                dtype=int,
+            )
+        else:
+            if self._l_band:
+                self.spectrum_channels_allocation = np.full(
+                    (self.topology.number_of_edges(),
+                     2 * self.num_spectrum_channels),
+                    fill_value=-1,
+                    dtype=int,
+                )
+                self.topology.graph["available_channels"] = np.ones(
+                    (self.topology.number_of_edges(),
+                    2 * self.num_spectrum_channels),
+                    dtype=int,
+                )
+            else:
+                self.spectrum_channels_allocation = np.full(
+                    (self.topology.number_of_edges(),
+                    self.num_spectrum_channels),
+                    fill_value=-1,
+                    dtype=int,
+                )
+                self.topology.graph["available_channels"] = np.ones(
+                    (self.topology.number_of_edges(),
+                    self.num_spectrum_channels),
+                    dtype=int,
+                )
 
         # do we allow proactive rejection or not?
         self.reject_action = 1 if allow_rejection else 0
@@ -338,11 +397,50 @@ class RMSAEnv(OpticalNetworkEnv):
             (self.topology.number_of_edges(), self.num_spectrum_resources), dtype=int
         )
 
+        if self._s_band:
+            self.topology.graph["available_channels"] = np.ones(
+                (self.topology.number_of_edges(),
+                2*self.num_spectrum_channels + self.number_spectrum_channels_s_band),
+                dtype=int,
+            )
+            self.spectrum_channels_allocation = np.full(
+                (self.topology.number_of_edges(), 2*self.num_spectrum_channels + self.number_spectrum_channels_s_band),
+                fill_value=-1,
+                dtype=int,
+            )
+        else:
+            if self._l_band:
+                self.topology.graph["available_channels"] = np.ones(
+                    (self.topology.number_of_edges(),
+                    2*self.num_spectrum_channels),
+                    dtype=int,
+                )
+                self.spectrum_channels_allocation = np.full(
+                    (self.topology.number_of_edges(),
+                     2 * self.num_spectrum_channels),
+                    fill_value=-1,
+                    dtype=int,
+                )
+            else:
+                self.topology.graph["available_channels"] = np.ones(
+                (self.topology.number_of_edges(),
+                self.num_spectrum_channels),
+                dtype=int,
+            )
+                self.spectrum_channels_allocation = np.full(
+                    (self.topology.number_of_edges(),
+                    self.num_spectrum_channels),
+                    fill_value=-1,
+                    dtype=int,
+                )
+
+
         self.spectrum_slots_allocation = np.full(
             (self.topology.number_of_edges(), self.num_spectrum_resources),
             fill_value=-1,
             dtype=int,
         )
+
 
         if self.bit_rate_selection == "discrete":
             self.bit_rate_requested_histogram = defaultdict(int)
@@ -635,6 +733,15 @@ class RMSAEnv(OpticalNetworkEnv):
                 return False
         return True
 
+    def is_channel_free(self, path: Path, channel_number:int) -> bool:
+        for i in range(len(path.node_list) - 1):
+            if self.topology.graph["available_channels"][
+                self.topology[path.node_list[i]][path.node_list[i + 1]]["index"],
+                channel_number] == 0:
+                return False
+        return True
+
+
     def get_available_slots(self, path: Path):
         available_slots = functools.reduce(
             np.multiply,
@@ -762,6 +869,33 @@ def shortest_path_first_fit(env: RMSAEnv) -> Tuple[int, int]:
         ):
             return (0, initial_slot)
     return (env.topology.graph["k_paths"], env.topology.graph["num_spectrum_resources"])
+
+
+def phy_aware_rmsa(env: RMSAEnv) -> Tuple[int, int]:
+# first to check if we have enough resource in virtual layer
+    if env.grooming_layer[env.current_service.service_id][env.current_service.destination_id] >= env.current_service.bit_rate:
+        env.grooming_layer[env.current_service.service_id][env.current_service.destination_id] -= env.current_service.bit_rate
+        return [-2, -2] # No need to establish a new service
+    else:
+        unassigned_bitrate = env.current_service.bit_rate
+        while unassigned_bitrate > 0:
+            ## this could be the Shortest available path first fit solution.
+
+            for idp, path in enumerate(
+                    env.k_shortest_paths[
+                        env.current_service.source, env.current_service.destination
+                    ]
+            ):
+                for channel_number in range(
+                    0, env.topology.graph["num_channel_resources"]
+                ):
+                    if env.is_channel_free(path,channel_number):
+                        pass
+
+
+
+
+
 
 
 def shortest_available_path_first_fit(env: RMSAEnv) -> Tuple[int, int]:
