@@ -87,7 +87,7 @@ class RMSAEnv(OpticalNetworkEnv):
         self.episode_bit_rate_provisioned = 0
         self.modulation_level = modulation_level
         self.connections_detail = connections_detail
-        self.gsnr = gsnr
+#        self.gsnr = gsnr
 
 
         # setting up bit rate selection

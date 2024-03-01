@@ -51,6 +51,9 @@ class PhyRMSAEnv(OpticalNetworkEnv):
         modulation_level: Optional[np.array] = None,
         connections_detail: Optional[np.array] = None,
         gsnr: Optional[np.array] = None,
+        defrag_period = None,
+        number_moves = None,
+        metric = 'cut',
     ):
         super().__init__(
             topology,
@@ -89,6 +92,9 @@ class PhyRMSAEnv(OpticalNetworkEnv):
         self.modulation_level = modulation_level
         self.connections_detail = connections_detail
         self.gsnr = gsnr
+        self.defrag_period = defrag_period
+        self.number_moves = number_moves
+        self.metric = metric
 
         self.number_cuts = 0
         self.rss_total_metric = 0
@@ -311,6 +317,38 @@ class PhyRMSAEnv(OpticalNetworkEnv):
         self._next_service()
         if self.episode_services_processed == 9000:
             a=1
+
+        # Periodical defragmentation
+
+        if self.defrag_period:
+            if self.services_processed % self.defrag_period == 0:
+                defrag_candidates = []
+                a = 1 ### there is no need to define a new channel class. go over running service, create the most good defragmentation options, then try to reallocate them.
+                for service in self.topology.graph["running_services"]:
+                    links_indexes= []
+                    for i in range(len(service.path.node_list) - 1):
+                        links_indexes.append(self.topology[service.path.node_list[i]][service.path.node_list[i + 1]]["index"])
+                    for channel in service.channels:
+                        defrag_candidates.append((self.calculate_r_cut(channel, links_indexes, True), self.current_time - service.arrival_time, channel,
+                                                  links_indexes, service))
+                sorted_defrag_candidates = sorted(defrag_candidates, key=lambda x: (-x[0], -x[1]))
+                num_moves=0
+                for i, candidate in enumerate(sorted_defrag_candidates):
+                    reallocation_options = []
+                    for channel_number in range(
+                        0, self.topology.graph["num_channel_resources"]
+                    ):
+                        if self.is_channel_free(candidate[4].path, channel_number):
+                            fragmentation_metric = self.calculate_r_cut(channel_number, candidate[3])
+                            reallocation_options.append((fragmentation_metric, channel_number))
+                    reallocation_options_sorted = sorted(reallocation_options, key=lambda x: (-x[0], x[1]))
+                    if len(reallocation_options_sorted) > 0: # the first options is chossed to be reallocated.
+                        if -1*reallocation_options_sorted[0][0] < candidate[0]: ## It makes sense to reallocate, since it gains in terms of number of cuts!
+                            self._move(candidate[4], reallocation_options_sorted[0][1], candidate[2])
+                            num_moves += 1
+                    if num_moves > self.number_moves:
+                        break
+
         return (
             self.observation(),
             reward,
@@ -457,12 +495,6 @@ class PhyRMSAEnv(OpticalNetworkEnv):
                     self.topology[path.node_list[i]][path.node_list[i + 1]]["index"],
                     channel,
                 ] = self.current_service.service_id
-                if channel <= self.num_spectrum_channels:
-                    self.bvts[1][self.current_service.source_id][self.current_service.destination_id] += 1
-                elif self.num_spectrum_channels < channel <= 2*self.num_spectrum_channels:
-                    self.bvts[0][self.current_service.source_id][self.current_service.destination_id] += 1
-                elif 2*self.num_spectrum_channels < channel < 2*self.num_spectrum_channels + self.number_spectrum_channels_s_band:
-                    self.bvts[2][self.current_service.source_id][self.current_service.destination_id] += 1
 
 
             self.topology[path.node_list[i]][path.node_list[i + 1]]["services"].append(
@@ -472,10 +504,57 @@ class PhyRMSAEnv(OpticalNetworkEnv):
                 "running_services"
             ].append(self.current_service)
             # self._update_link_stats(path.node_list[i], path.node_list[i + 1])
+
+        for channel in channels:
+            if channel <= self.num_spectrum_channels:
+                self.bvts[1][self.current_service.source_id][self.current_service.destination_id] += 1
+            elif self.num_spectrum_channels < channel <= 2*self.num_spectrum_channels:
+                self.bvts[0][self.current_service.source_id][self.current_service.destination_id] += 1
+            elif 2*self.num_spectrum_channels < channel < 2*self.num_spectrum_channels + self.number_spectrum_channels_s_band:
+                self.bvts[2][self.current_service.source_id][self.current_service.destination_id] += 1
+
         self.topology.graph["running_services"].append(self.current_service)
         self.current_service.path = path
         self.current_service.channels = channels
         # self._update_network_stats()
+
+
+    ### we remove and add the running services for future use!
+    def _move(self, service: Service, new_channel, old_channel):
+
+        for i in range(len(service.path.node_list) - 1):
+            self.topology.graph["available_channels"][
+                self.topology[service.path.node_list[i]][service.path.node_list[i + 1]]["index"],
+                new_channel,
+            ] = 0
+            self.spectrum_channels_allocation[
+                self.topology[service.path.node_list[i]][service.path.node_list[i + 1]]["index"],
+                new_channel,
+            ] = service.service_id
+
+            self.topology.graph["available_channels"][
+                self.topology[service.path.node_list[i]][service.path.node_list[i + 1]][
+                    "index"
+                ],
+                old_channel,
+            ] = 1
+            self.spectrum_channels_allocation[
+                self.topology[service.path.node_list[i]][service.path.node_list[i + 1]][
+                    "index"
+                ],
+                old_channel,
+            ] = -1
+            self.topology[service.path.node_list[i]][service.path.node_list[i + 1]][
+                "running_services"
+            ].remove(service)
+        self.topology.graph["running_services"].remove(service)
+        service.channels.remove(old_channel)
+        service.channels.append(new_channel)
+        for i in range(len(service.path.node_list) - 1):
+            self.topology[service.path.node_list[i]][service.path.node_list[i + 1]][
+                "running_services"
+            ].append(service)
+        self.topology.graph["running_services"].append(service)
 
     def _service_acceptance(self, virtual: bool):
         self.current_service.virtual_layer = virtual
@@ -514,8 +593,16 @@ class PhyRMSAEnv(OpticalNetworkEnv):
             # self._update_link_stats(
             #     service.path.node_list[i], service.path.node_list[i + 1]
             # )
+
         self.topology.graph["running_services"].remove(service)
 
+        for channel in service.channels:
+            if channel <= self.num_spectrum_channels:
+                self.bvts[1][self.current_service.source_id][self.current_service.destination_id] -= 1
+            elif self.num_spectrum_channels < channel <= 2*self.num_spectrum_channels:
+                self.bvts[0][self.current_service.source_id][self.current_service.destination_id] -= 1
+            elif 2*self.num_spectrum_channels < channel < 2*self.num_spectrum_channels + self.number_spectrum_channels_s_band:
+                self.bvts[2][self.current_service.source_id][self.current_service.destination_id] = 1
     def _update_network_stats(self):
         last_update = self.topology.graph["last_update"]
         time_diff = self.current_time - last_update
@@ -771,12 +858,18 @@ class PhyRMSAEnv(OpticalNetworkEnv):
 
         return r_spatial/(self.num_spectrum_channels + self.num_spectrum_channels + self.number_spectrum_channels_s_band)
 
-    def calculate_r_cut(self, channel_number, link_indexes):
+    def calculate_r_cut(self, channel_number, link_indexes, defrag_flag: bool = False):
+        # defrag_flag is used to check when this function has been called, in the defragmentation process
+        # or in the fragmentation aware process.
         initial_indices, values, lengths = \
             RMSAEnv.rle(self.topology.graph['available_channels'][:, channel_number])
         temporary_channels = copy.deepcopy(self.topology.graph['available_channels'][:, channel_number])
-        for i in link_indexes:
-            temporary_channels[i] = 0
+        if defrag_flag:
+            for i in link_indexes:
+                temporary_channels[i] = 1
+        else:
+            for i in link_indexes:
+                temporary_channels[i] = 0
         initial_indices_after, values_after, lengths_after = \
             RMSAEnv.rle(temporary_channels)
         return np.sum(values) - np.sum(values_after)

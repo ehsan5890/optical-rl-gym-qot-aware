@@ -1,0 +1,4 @@
+#{"t_start": 1709053842.264687, "env_id": "PhyRMSA-v0"}
+r,l,t,episode_service_blocking_rate,service_blocking_rate,episode_bit_rate_blocking_rate,number_cuts_total,rss_total_metric,C_BVTs,L_BVTs,S_BVTs,total_path_length
+4.0,4,0.092768,0.0,0.0,0.0,1.0522388059701493,0.9381584548984411,3.4,0.0,0.0,4981
+4.0,4,0.192491,0.0,0.0,0.0,1.1119402985074627,0.9312456369431059,4.0,0.0,0.0,9334
