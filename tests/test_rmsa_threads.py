@@ -23,8 +23,8 @@ import copy
 # logging.getLogger("rmsaenv").setLevel(logging.INFO)
 
 seed = 20
-episodes = 2
-episode_length = 4
+episodes = 1
+episode_length = 17
 
 monitor_files = []
 policies = []
@@ -51,8 +51,9 @@ modulation_jpn12 = mat_file['Modulation_connection_JPN12_k7SP_CHBFullyLoaded_SCL
 gsnr_jpn12 = mat_file1['GSNR_connection_JPN12_k7SP_CHBFullyLoaded_SCL_Uniform']
 all_connections_jpn12 = mat_file2['All_connections_Profile_JPN12_k7SP_CHBFullyLoaded_SCL_Uniform']
 
-min_load = 1180
-max_load = 1490
+
+min_load = 1300
+max_load = 1301
 step_length = 60
 steps = int((max_load - min_load)/step_length) +1
 
@@ -63,22 +64,25 @@ def run_with_callback(callback, env_args, num_eps, log_dir):
         env = Monitor(env, log_dir + 'SAP-FF',
                              info_keywords=('episode_service_blocking_rate', 'service_blocking_rate',
                                             'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
-                                            'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length'))
+                                            'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length', 'num_moves', 'num_defrag_cycle'))
     elif callback is phy_aware_bmff_rmsa:
         env = gym.make("PhyRMSA-v0", **env_args)
         env = Monitor(env, log_dir + 'BM-SA-FF', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
                                                                                                  'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
-                                                                                                 'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length'))
+                                                                                                 'C_BVTs', 'L_BVTs', 'S_BVTs',
+                                                                                                    'total_path_length', 'num_moves', 'num_defrag_cycle'))
     elif callback is phy_aware_bmfa_rmsa:
         env = gym.make("PhyRMSA-v0", **env_args)
         env = Monitor(env, log_dir + 'BM-FA-Cut', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
                                                                                                  'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
-                                                                                                 'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length'))
+                                                                                                 'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length',
+                                                                                                    'num_moves', 'num_defrag_cycle'))
     else:
         env = gym.make("PhyRMSA-v0", **env_args)
         env = Monitor(env, log_dir + 'BM-FA-RSS', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
                                                                                                  'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
-                                                                                                 'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length'))
+                                                                                                 'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length',
+                                                                 'num_moves', 'num_defrag_cycle'))
 
     evaluate_heuristic(
         env, callback, n_eval_episodes=num_eps
@@ -107,34 +111,21 @@ if __name__ == '__main__':
 
 
         env_phy_df = gym.make("PhyRMSA-v0", **env_args)
-        # env_phy_df = Monitor(env_phy_df, log_dir + 'SAP-FF',
-        #                      info_keywords=('episode_service_blocking_rate', 'service_blocking_rate',
-        #                                     'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
-        #                                     'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length'))
+
         p = Process(target=run_with_callback, args=(phy_aware_sapff_rmsa, copy.deepcopy(env_args), episodes,log_dir))
         p.start()
         processes.append(p)
-        # env_phy_bmff_df = gym.make("PhyRMSA-v0", **env_args)
-        # env_phy_bmff_df = Monitor(env_phy_bmff_df, log_dir + 'BM-SA-FF', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
-        #                                                                                          'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
-        #                                                                                          'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length'))
+
         p = Process(target=run_with_callback, args=(phy_aware_bmff_rmsa, copy.deepcopy(env_args), episodes,log_dir))
         p.start()
         processes.append(p)
 
-        # env_phy_bmfa_cut_df = gym.make("PhyRMSA-v0", **env_args)
-        # env_phy_bmfa_cut_df = Monitor(env_phy_bmfa_cut_df, log_dir + 'BM-FA-Cut', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
-        #                                                                                          'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
-        #                                                                                          'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length'))
 
         p = Process(target=run_with_callback, args=(phy_aware_bmfa_rmsa, copy.deepcopy(env_args), episodes,log_dir))
         p.start()
         processes.append(p)
 
-        # env_phy_bmfa_rss_df = gym.make("PhyRMSA-v0", **env_args)
-        # env_phy_bmfa_rss_df = Monitor(env_phy_bmfa_rss_df, log_dir + 'BM-FA-RSS', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
-        #                                                                                          'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
-        #                                                                                          'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length'))
+
         p = Process(target=run_with_callback, args=(phy_aware_bmfa_rss_rmsa, copy.deepcopy(env_args), episodes,log_dir))
         p.start()
         processes.append(p)
@@ -162,31 +153,43 @@ if __name__ == '__main__':
         os.makedirs(log_dir, exist_ok=True)
 
 
-        # env_phy_df = Monitor(env_phy_df, log_dir + 'SAP-FF',
-        #                      info_keywords=('episode_service_blocking_rate', 'service_blocking_rate',
-        #                                     'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
-        #                                     'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length'))
         p = Process(target=run_with_callback, args=(phy_aware_sapff_rmsa, copy.deepcopy(env_args_defrag), episodes,log_dir))
         p.start()
         processes.append(p)
-        # env_phy_bmff_df = gym.make("PhyRMSA-v0", **env_args)
-        # env_phy_bmff_df = Monitor(env_phy_bmff_df, log_dir + 'BM-SA-FF', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
-        #                                                                                          'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
-        #                                                                                          'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length'))
-        p = Process(target=run_with_callback, args=(phy_aware_bmff_rmsa, copy.deepcopy(env_args_defrag), episodes,log_dir))
-        p.start()
-        processes.append(p)
 
-        # env_phy_bmfa_cut_df = gym.make("PhyRMSA-v0", **env_args)
-        # env_phy_bmfa_cut_df = Monitor(env_phy_bmfa_cut_df, log_dir + 'BM-FA-Cut', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
-        #                                                                                          'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
-        #                                                                                          'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length'))
+
+
+
 
         p = Process(target=run_with_callback, args=(phy_aware_bmfa_rmsa, copy.deepcopy(env_args_defrag), episodes,log_dir))
         p.start()
         processes.append(p)
 
-        p = Process(target=run_with_callback, args=(phy_aware_bmfa_rss_rmsa, copy.deepcopy(env_args_defrag), episodes,log_dir))
+        env_args_defrag_rss = dict(
+            topology=topology,
+            seed=10,
+            allow_rejection=True,
+            load=load,
+            mean_service_holding_time=25,
+            episode_length=episode_length,
+            num_spectrum_resources=64,
+            bit_rate_selection="discrete",
+            modulation_level=modulation_jpn12,
+            connections_detail=all_connections_jpn12,
+            gsnr=gsnr_jpn12,
+            number_spectrum_channels=80,
+            number_spectrum_channels_s_band=108,
+            defrag_period=10,
+            number_moves=10,
+            metric='rss'
+
+        )
+
+        p = Process(target=run_with_callback, args=(phy_aware_bmfa_rss_rmsa, copy.deepcopy(env_args_defrag_rss), episodes,log_dir))
+        p.start()
+        processes.append(p)
+
+        p = Process(target=run_with_callback, args=(phy_aware_bmff_rmsa, copy.deepcopy(env_args_defrag_rss), episodes,log_dir))
         p.start()
         processes.append(p)
     [p.join() for p in processes]  # wait for the completion of all processes
