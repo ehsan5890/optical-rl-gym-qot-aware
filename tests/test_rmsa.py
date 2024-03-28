@@ -21,8 +21,8 @@ from optical_rl_gym.utils import evaluate_heuristic, random_policy
 # logging.getLogger("rmsaenv").setLevel(logging.INFO)
 
 seed = 20
-episodes = 1
-episode_length = 10000
+episodes = 10
+episode_length = 3
 
 monitor_files = []
 policies = []
@@ -121,7 +121,7 @@ for load_counter, load in enumerate(range(min_load,max_load,step_length)):
     env_phy_bmfa_cut_df = gym.make("PhyRMSA-v0", **env_args)
     env_phy_bmfa_cut_df = Monitor(env_phy_bmfa_cut_df, log_dir + 'BM-FA-Cut', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
                                                                                              'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
-                                                                                             'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length'))
+                                                                                             'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length', 'avrage_gsnr', 'average_mod_level'))
     mean_reward_sp, std_reward_sp = evaluate_heuristic(
         env_phy_bmfa_cut_df, phy_aware_bmfa_rmsa, n_eval_episodes=episodes
     )
@@ -164,40 +164,40 @@ for load_counter, load in enumerate(range(min_load,max_load,step_length)):
 
 
 
-    env_args_defrag = dict(
-        topology=topology,
-        seed=10,
-        allow_rejection=True,
-        load=load,
-        mean_service_holding_time=25,
-        episode_length=episode_length,
-        num_spectrum_resources=64,
-        bit_rate_selection="discrete",
-        modulation_level=modulation_jpn12,
-        connections_detail=all_connections_jpn12,
-        gsnr=gsnr_jpn12,
-        number_spectrum_channels=80,
-        number_spectrum_channels_s_band=108,
-        defrag_period=10,
-        number_moves=10,
-
-    )
-
-    env_phy_bmfa_cut_df = gym.make("PhyRMSA-v0", **env_args_defrag)
-    env_phy_bmfa_cut_df = Monitor(env_phy_bmfa_cut_df, log_dir + 'BM-FA-Cut', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
-                                                                                             'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
-                                                                                             'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length'))
-    mean_reward_sp, std_reward_sp = evaluate_heuristic(
-        env_phy_bmfa_cut_df, phy_aware_bmfa_rmsa, n_eval_episodes=episodes
-    )
-    print("BM-FA-defrag:".ljust(8), f"{mean_reward_sp:.4f}  {std_reward_sp:<7.4f}")
-    print(
-        "\tBit rate blocking:",
-        (env_phy_bmfa_cut_df.episode_bit_rate_requested - env_phy_bmfa_cut_df.episode_bit_rate_provisioned)
-        / env_phy_bmfa_cut_df.episode_bit_rate_requested,
-    )
-    print(
-        "\tRequest blocking:",
-        (env_phy_bmfa_cut_df.episode_services_processed - env_phy_bmfa_cut_df.episode_services_accepted)
-        / env_phy_bmfa_cut_df.episode_services_processed,
-    )
+    # env_args_defrag = dict(
+    #     topology=topology,
+    #     seed=10,
+    #     allow_rejection=True,
+    #     load=load,
+    #     mean_service_holding_time=25,
+    #     episode_length=episode_length,
+    #     num_spectrum_resources=64,
+    #     bit_rate_selection="discrete",
+    #     modulation_level=modulation_jpn12,
+    #     connections_detail=all_connections_jpn12,
+    #     gsnr=gsnr_jpn12,
+    #     number_spectrum_channels=80,
+    #     number_spectrum_channels_s_band=108,
+    #     defrag_period=10,
+    #     number_moves=10,
+    #
+    # )
+    #
+    # env_phy_bmfa_cut_df = gym.make("PhyRMSA-v0", **env_args_defrag)
+    # env_phy_bmfa_cut_df = Monitor(env_phy_bmfa_cut_df, log_dir + 'BM-FA-Cut', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
+    #                                                                                          'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
+    #                                                                                          'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length'))
+    # mean_reward_sp, std_reward_sp = evaluate_heuristic(
+    #     env_phy_bmfa_cut_df, phy_aware_bmfa_rmsa, n_eval_episodes=episodes
+    # )
+    # print("BM-FA-defrag:".ljust(8), f"{mean_reward_sp:.4f}  {std_reward_sp:<7.4f}")
+    # print(
+    #     "\tBit rate blocking:",
+    #     (env_phy_bmfa_cut_df.episode_bit_rate_requested - env_phy_bmfa_cut_df.episode_bit_rate_provisioned)
+    #     / env_phy_bmfa_cut_df.episode_bit_rate_requested,
+    # )
+    # print(
+    #     "\tRequest blocking:",
+    #     (env_phy_bmfa_cut_df.episode_services_processed - env_phy_bmfa_cut_df.episode_services_accepted)
+    #     / env_phy_bmfa_cut_df.episode_services_processed,
+    # )

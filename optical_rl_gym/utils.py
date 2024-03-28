@@ -33,6 +33,23 @@ class Path:
     best_modulation: Optional[Modulation] = field(default=None)
     current_modulation: Optional[Modulation] = field(default=None)
 
+#
+# @dataclass
+# class Span:
+#     length: float
+#     attenuation: float
+#     default_attenuation: float
+#     noise_figure: float
+#
+#
+# @dataclass
+# class Link:
+#     id: int
+#     length: float
+#     spans: tuple[Span]
+#     node1: Optional[str] = field(default=None)
+#     node2: Optional[str] = field(default=None)
+#
 
 @dataclass(repr=False)
 class Service:

@@ -97,7 +97,11 @@ class PhyRMSAEnv(OpticalNetworkEnv):
 
         self.number_cuts = 0
         self.rss_total_metric = 0
-        self.total_path_length = 0
+        self.total_path_length_episode = 0
+        self.total_gsnr_episode = 0
+        self.total_modulation_level_episode = 0
+        self.channels_accepted_episode = 0
+        self.physical_services_accepted_episode = 0
         self.counted_moves = 0
         self.counted_defrag_cycles = 0
         # setting up bit rate selection
@@ -284,9 +288,9 @@ class PhyRMSAEnv(OpticalNetworkEnv):
 
         self.number_cuts = self._calculate_total_cuts()
         self.rss_total_metric = self.calculate_total_r_spatial()
-        self.total_path_length = 0
-        for service in self.topology.graph["running_services"]:
-            self.total_path_length += service.path.length
+        # self.total_path_length = 0
+        # for service in self.topology.graph["running_services"]: ## It is not the best way.
+        #     self.total_path_length += service.path.length
 
         reward = self.reward()
         info = {
@@ -309,9 +313,11 @@ class PhyRMSAEnv(OpticalNetworkEnv):
             "C_BVTs": np.sum(self.bvts[1]) / (self.services_accepted + 1),
             "L_BVTs": np.sum(self.bvts[0]) / (self.services_accepted + 1),
             "S_BVTs": np.sum(self.bvts[2]) / (self.services_accepted + 1),
-            "total_path_length": self.total_path_length,
+            "total_path_length": self.total_path_length_episode/( self.physical_services_accepted_episode + 1),
             "num_moves": self.counted_moves,
             "num_defrag_cycle": self.counted_defrag_cycles,
+            "avrage_gsnr": self.total_gsnr_episode/(self.channels_accepted_episode + 1),
+            "average_mod_level": self.total_modulation_level_episode/(self.channels_accepted_episode+1),
         }
 
         self._new_service = False
@@ -377,8 +383,13 @@ class PhyRMSAEnv(OpticalNetworkEnv):
         self.episode_bit_rate_provisioned = 0
         self.episode_services_processed = 0
         self.episode_services_accepted = 0
+        self.total_path_length_episode = 0
         self.counted_defrag_cycles = 0
         self.counted_moves = 0
+        self.total_gsnr_episode = 0
+        self.total_modulation_level_episode = 0
+        self.channels_accepted_episode = 0
+        self.physical_services_accepted_episode = 0
         self.episode_actions_output = np.zeros(
             (
                 self.k_paths + self.reject_action,
@@ -501,6 +512,20 @@ class PhyRMSAEnv(OpticalNetworkEnv):
                 2,
             )
         )
+        table_id = np.where(((self.connections_detail[:, 0] == int(self.current_service.source)) & (
+                self.connections_detail[:, 1] == int(self.current_service.destination))) | (
+                         (self.connections_detail[:, 0] == int(self.current_service.destination)) & (
+                         self.connections_detail[:, 1] == int(self.current_service.source))))[0][0]
+
+        for idp, serached_path in enumerate(
+                self.k_shortest_paths[
+                    self.current_service.source, self.current_service.destination
+                ]
+        ):
+            if serached_path == path:
+                break
+
+
         for i in range(len(path.node_list) - 1):
             for channel in channels:
                 self.topology.graph["available_channels"][
@@ -512,6 +537,10 @@ class PhyRMSAEnv(OpticalNetworkEnv):
                     channel,
                 ] = self.current_service.service_id
 
+
+
+
+
             self.topology[path.node_list[i]][path.node_list[i + 1]]["services"].append(
                 self.current_service
             )
@@ -521,6 +550,11 @@ class PhyRMSAEnv(OpticalNetworkEnv):
             # self._update_link_stats(path.node_list[i], path.node_list[i + 1])
 
         for channel in channels:
+            mod_level = self.modulation_level[table_id][channel][idp]
+            gsnr = self.gsnr[table_id][channel][idp]
+            self.total_gsnr_episode += gsnr
+            self.total_modulation_level_episode += mod_level
+            self.channels_accepted_episode += 1
             if channel <= self.num_spectrum_channels:
                 self.bvts[1][self.current_service.source_id][self.current_service.destination_id] += 1
             elif self.num_spectrum_channels < channel <= 2 * self.num_spectrum_channels:
@@ -575,6 +609,9 @@ class PhyRMSAEnv(OpticalNetworkEnv):
         self.current_service.accepted = True
         self.services_accepted += 1
         self.episode_services_accepted += 1
+        if not virtual:
+            self.total_path_length_episode += self.current_service.path.length
+            self.physical_services_accepted_episode +=1
         self.bit_rate_provisioned += self.current_service.bit_rate
         self.episode_bit_rate_provisioned += self.current_service.bit_rate
 

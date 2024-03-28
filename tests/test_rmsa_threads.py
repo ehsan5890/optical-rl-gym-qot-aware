@@ -23,8 +23,8 @@ import copy
 # logging.getLogger("rmsaenv").setLevel(logging.INFO)
 
 seed = 20
-episodes = 1
-episode_length = 17
+episodes = 200
+episode_length = 230
 
 monitor_files = []
 policies = []
@@ -52,8 +52,8 @@ gsnr_jpn12 = mat_file1['GSNR_connection_JPN12_k7SP_CHBFullyLoaded_SCL_Uniform']
 all_connections_jpn12 = mat_file2['All_connections_Profile_JPN12_k7SP_CHBFullyLoaded_SCL_Uniform']
 
 
-min_load = 1300
-max_load = 1301
+min_load = 1000
+max_load = 1064
 step_length = 60
 steps = int((max_load - min_load)/step_length) +1
 
@@ -130,66 +130,66 @@ if __name__ == '__main__':
         p.start()
         processes.append(p)
 
-        env_args_defrag = dict(
-            topology=topology,
-            seed=10,
-            allow_rejection=True,
-            load=load,
-            mean_service_holding_time=25,
-            episode_length=episode_length,
-            num_spectrum_resources=64,
-            bit_rate_selection="discrete",
-            modulation_level=modulation_jpn12,
-            connections_detail=all_connections_jpn12,
-            gsnr=gsnr_jpn12,
-            number_spectrum_channels=80,
-            number_spectrum_channels_s_band=108,
-            defrag_period=10,
-            number_moves=10,
-
-        )
-
-        log_dir = f'{logging_dir}/logs_{load}_{episode_length}-defragmeentation/'
-        os.makedirs(log_dir, exist_ok=True)
-
-
-        p = Process(target=run_with_callback, args=(phy_aware_sapff_rmsa, copy.deepcopy(env_args_defrag), episodes,log_dir))
-        p.start()
-        processes.append(p)
-
-
-
-
-
-        p = Process(target=run_with_callback, args=(phy_aware_bmfa_rmsa, copy.deepcopy(env_args_defrag), episodes,log_dir))
-        p.start()
-        processes.append(p)
-
-        env_args_defrag_rss = dict(
-            topology=topology,
-            seed=10,
-            allow_rejection=True,
-            load=load,
-            mean_service_holding_time=25,
-            episode_length=episode_length,
-            num_spectrum_resources=64,
-            bit_rate_selection="discrete",
-            modulation_level=modulation_jpn12,
-            connections_detail=all_connections_jpn12,
-            gsnr=gsnr_jpn12,
-            number_spectrum_channels=80,
-            number_spectrum_channels_s_band=108,
-            defrag_period=10,
-            number_moves=10,
-            metric='rss'
-
-        )
-
-        p = Process(target=run_with_callback, args=(phy_aware_bmfa_rss_rmsa, copy.deepcopy(env_args_defrag_rss), episodes,log_dir))
-        p.start()
-        processes.append(p)
-
-        p = Process(target=run_with_callback, args=(phy_aware_bmff_rmsa, copy.deepcopy(env_args_defrag_rss), episodes,log_dir))
-        p.start()
-        processes.append(p)
+        # env_args_defrag = dict(
+        #     topology=topology,
+        #     seed=10,
+        #     allow_rejection=True,
+        #     load=load,
+        #     mean_service_holding_time=25,
+        #     episode_length=episode_length,
+        #     num_spectrum_resources=64,
+        #     bit_rate_selection="discrete",
+        #     modulation_level=modulation_jpn12,
+        #     connections_detail=all_connections_jpn12,
+        #     gsnr=gsnr_jpn12,
+        #     number_spectrum_channels=80,
+        #     number_spectrum_channels_s_band=108,
+        #     defrag_period=10,
+        #     number_moves=10,
+        #
+        # )
+        #
+        # log_dir = f'{logging_dir}/logs_{load}_{episode_length}-defragmeentation/'
+        # os.makedirs(log_dir, exist_ok=True)
+        #
+        #
+        # p = Process(target=run_with_callback, args=(phy_aware_sapff_rmsa, copy.deepcopy(env_args_defrag), episodes,log_dir))
+        # p.start()
+        # processes.append(p)
+        #
+        #
+        #
+        #
+        #
+        # p = Process(target=run_with_callback, args=(phy_aware_bmfa_rmsa, copy.deepcopy(env_args_defrag), episodes,log_dir))
+        # p.start()
+        # processes.append(p)
+        #
+        # env_args_defrag_rss = dict(
+        #     topology=topology,
+        #     seed=10,
+        #     allow_rejection=True,
+        #     load=load,
+        #     mean_service_holding_time=25,
+        #     episode_length=episode_length,
+        #     num_spectrum_resources=64,
+        #     bit_rate_selection="discrete",
+        #     modulation_level=modulation_jpn12,
+        #     connections_detail=all_connections_jpn12,
+        #     gsnr=gsnr_jpn12,
+        #     number_spectrum_channels=80,
+        #     number_spectrum_channels_s_band=108,
+        #     defrag_period=10,
+        #     number_moves=10,
+        #     metric='rss'
+        #
+        # )
+        #
+        # p = Process(target=run_with_callback, args=(phy_aware_bmfa_rss_rmsa, copy.deepcopy(env_args_defrag_rss), episodes,log_dir))
+        # p.start()
+        # processes.append(p)
+        #
+        # p = Process(target=run_with_callback, args=(phy_aware_bmff_rmsa, copy.deepcopy(env_args_defrag_rss), episodes,log_dir))
+        # p.start()
+        # processes.append(p)
     [p.join() for p in processes]  # wait for the completion of all processes
