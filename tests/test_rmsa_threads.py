@@ -23,8 +23,8 @@ import copy
 # logging.getLogger("rmsaenv").setLevel(logging.INFO)
 
 seed = 20
-episodes = 200
-episode_length = 230
+episodes = 1000
+episode_length = 205
 
 monitor_files = []
 policies = []
@@ -52,9 +52,9 @@ gsnr_jpn12 = mat_file1['GSNR_connection_JPN12_k7SP_CHBFullyLoaded_SCL_Uniform']
 all_connections_jpn12 = mat_file2['All_connections_Profile_JPN12_k7SP_CHBFullyLoaded_SCL_Uniform']
 
 
-min_load = 1000
-max_load = 1064
-step_length = 60
+min_load = 1080
+max_load = 1130
+step_length = 40
 steps = int((max_load - min_load)/step_length) +1
 
 def run_with_callback(callback, env_args, num_eps, log_dir):
@@ -64,25 +64,28 @@ def run_with_callback(callback, env_args, num_eps, log_dir):
         env = Monitor(env, log_dir + 'SAP-FF',
                              info_keywords=('episode_service_blocking_rate', 'service_blocking_rate',
                                             'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
-                                            'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length', 'num_moves', 'num_defrag_cycle'))
+                                            'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length', 'num_moves',
+                                            'num_defrag_cycle', 'avrage_gsnr', 'average_mod_level'))
     elif callback is phy_aware_bmff_rmsa:
         env = gym.make("PhyRMSA-v0", **env_args)
         env = Monitor(env, log_dir + 'BM-SA-FF', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
                                                                                                  'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
                                                                                                  'C_BVTs', 'L_BVTs', 'S_BVTs',
-                                                                                                    'total_path_length', 'num_moves', 'num_defrag_cycle'))
+                                                                                                    'total_path_length', 'num_moves',
+                                                                'num_defrag_cycle', 'avrage_gsnr', 'average_mod_level'))
     elif callback is phy_aware_bmfa_rmsa:
         env = gym.make("PhyRMSA-v0", **env_args)
         env = Monitor(env, log_dir + 'BM-FA-Cut', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
                                                                                                  'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
                                                                                                  'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length',
-                                                                                                    'num_moves', 'num_defrag_cycle'))
+                                                                                                    'num_moves',
+                                                                 'num_defrag_cycle','avrage_gsnr', 'average_mod_level'))
     else:
         env = gym.make("PhyRMSA-v0", **env_args)
         env = Monitor(env, log_dir + 'BM-FA-RSS', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
                                                                                                  'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
                                                                                                  'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length',
-                                                                 'num_moves', 'num_defrag_cycle'))
+                                                                 'num_moves', 'num_defrag_cycle', 'avrage_gsnr', 'average_mod_level'))
 
     evaluate_heuristic(
         env, callback, n_eval_episodes=num_eps
