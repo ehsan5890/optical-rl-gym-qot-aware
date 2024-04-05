@@ -82,6 +82,16 @@ def run_with_callback(callback, env_args, num_eps, log_dir):
                                                                                                  'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length',
                                                                                                     'num_moves',
                                                                  'num_defrag_cycle','avrage_gsnr', 'average_mod_level'))
+
+    elif callback is phy_aware_sapbm_rmsa:
+        env = gym.make("PhyRMSA-v0", **env_args)
+        env = Monitor(env, log_dir + 'BM-FA-SAPBM', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
+                                                                                                 'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
+                                                                                                 'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length',
+                                                                                                    'num_moves',
+                                                                 'num_defrag_cycle','avrage_gsnr', 'average_mod_level'))
+
+
     else:
         env = gym.make("PhyRMSA-v0", **env_args)
         env = Monitor(env, log_dir + 'BM-FA-RSS', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
