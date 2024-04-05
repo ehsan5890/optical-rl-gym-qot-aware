@@ -12,7 +12,8 @@ from optical_rl_gym.envs.phy_rmsa_env import (
     phy_aware_sapff_rmsa,
     phy_aware_bmff_rmsa,
     phy_aware_bmfa_rmsa,
-    phy_aware_bmfa_rss_rmsa
+    phy_aware_bmfa_rss_rmsa,
+    phy_aware_sapbm_rmsa
 
 )
 from optical_rl_gym.utils import evaluate_heuristic, random_policy
@@ -21,8 +22,8 @@ from optical_rl_gym.utils import evaluate_heuristic, random_policy
 # logging.getLogger("rmsaenv").setLevel(logging.INFO)
 
 seed = 20
-episodes = 10
-episode_length = 3
+episodes = 1
+episode_length = 200
 
 monitor_files = []
 policies = []
@@ -68,8 +69,8 @@ for load_counter, load in enumerate(range(min_load,max_load,step_length)):
         modulation_level=modulation_jpn12,
         connections_detail=all_connections_jpn12,
         gsnr=gsnr_jpn12,
-        number_spectrum_channels=80,
-        number_spectrum_channels_s_band=108,
+        number_spectrum_channels=10,
+        number_spectrum_channels_s_band=10,
 
     )
 
@@ -118,23 +119,44 @@ for load_counter, load in enumerate(range(min_load,max_load,step_length)):
     #     / env_phy_bmff_df.episode_services_processed,
     # )
 
-    env_phy_bmfa_cut_df = gym.make("PhyRMSA-v0", **env_args)
-    env_phy_bmfa_cut_df = Monitor(env_phy_bmfa_cut_df, log_dir + 'BM-FA-Cut', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
+    # env_phy_bmfa_cut_df = gym.make("PhyRMSA-v0", **env_args)
+    # env_phy_bmfa_cut_df = Monitor(env_phy_bmfa_cut_df, log_dir + 'BM-FA-Cut', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
+    #                                                                                          'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
+    #                                                                                          'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length', 'avrage_gsnr', 'average_mod_level'))
+    # mean_reward_sp, std_reward_sp = evaluate_heuristic(
+    #     env_phy_bmfa_cut_df, phy_aware_bmfa_rmsa, n_eval_episodes=episodes
+    # )
+    # print("BM-FA:".ljust(8), f"{mean_reward_sp:.4f}  {std_reward_sp:<7.4f}")
+    # print(
+    #     "\tBit rate blocking:",
+    #     (env_phy_bmfa_cut_df.episode_bit_rate_requested - env_phy_bmfa_cut_df.episode_bit_rate_provisioned)
+    #     / env_phy_bmfa_cut_df.episode_bit_rate_requested,
+    # )
+    # print(
+    #     "\tRequest blocking:",
+    #     (env_phy_bmfa_cut_df.episode_services_processed - env_phy_bmfa_cut_df.episode_services_accepted)
+    #     / env_phy_bmfa_cut_df.episode_services_processed,
+    # )
+
+
+
+    env_phy_sabm = gym.make("PhyRMSA-v0", **env_args)
+    env_phy_sabm = Monitor(env_phy_sabm, log_dir + 'SA-BM', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
                                                                                              'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
                                                                                              'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length', 'avrage_gsnr', 'average_mod_level'))
     mean_reward_sp, std_reward_sp = evaluate_heuristic(
-        env_phy_bmfa_cut_df, phy_aware_bmfa_rmsa, n_eval_episodes=episodes
+        env_phy_sabm, phy_aware_sapbm_rmsa, n_eval_episodes=episodes
     )
     print("BM-FA:".ljust(8), f"{mean_reward_sp:.4f}  {std_reward_sp:<7.4f}")
     print(
         "\tBit rate blocking:",
-        (env_phy_bmfa_cut_df.episode_bit_rate_requested - env_phy_bmfa_cut_df.episode_bit_rate_provisioned)
-        / env_phy_bmfa_cut_df.episode_bit_rate_requested,
+        (env_phy_sabm.episode_bit_rate_requested - env_phy_sabm.episode_bit_rate_provisioned)
+        / env_phy_sabm.episode_bit_rate_requested,
     )
     print(
         "\tRequest blocking:",
-        (env_phy_bmfa_cut_df.episode_services_processed - env_phy_bmfa_cut_df.episode_services_accepted)
-        / env_phy_bmfa_cut_df.episode_services_processed,
+        (env_phy_sabm.episode_services_processed - env_phy_sabm.episode_services_accepted)
+        / env_phy_sabm.episode_services_processed,
     )
 
 

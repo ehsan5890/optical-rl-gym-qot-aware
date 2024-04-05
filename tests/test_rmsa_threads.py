@@ -12,7 +12,9 @@ from optical_rl_gym.envs.phy_rmsa_env import (
     phy_aware_sapff_rmsa,
     phy_aware_bmff_rmsa,
     phy_aware_bmfa_rmsa,
-    phy_aware_bmfa_rss_rmsa
+    phy_aware_bmfa_rss_rmsa,
+    phy_aware_sapbm_rmsa
+
 
 )
 from optical_rl_gym.utils import evaluate_heuristic, random_policy
@@ -130,6 +132,10 @@ if __name__ == '__main__':
 
 
         p = Process(target=run_with_callback, args=(phy_aware_bmfa_rss_rmsa, copy.deepcopy(env_args), episodes,log_dir))
+        p.start()
+        processes.append(p)
+
+        p = Process(target=run_with_callback, args=(phy_aware_sapbm_rmsa, copy.deepcopy(env_args), episodes,log_dir))
         p.start()
         processes.append(p)
 

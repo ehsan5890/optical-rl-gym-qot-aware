@@ -1029,6 +1029,91 @@ def phy_aware_sapff_rmsa(env: PhyRMSAEnv) -> Tuple[int, list]:
         return (-2, [])  # -2 means service is blocked
 
 
+def phy_aware_sapbm_rmsa(env: PhyRMSAEnv) -> Tuple[int, list]:
+    # first to check if we have enough resource in virtual layer
+    # TODO: this is not the best way to handle the grroming layer. For example, if grooming layer has 300 Gbps, and service is 500 Gbps, then 300 can be used!
+    if env.grooming_layer[env.current_service.source_id][
+        env.current_service.destination_id] >= env.current_service.bit_rate:
+        env.grooming_layer[env.current_service.source_id][
+            env.current_service.destination_id] -= env.current_service.bit_rate
+        return (-1, [])  # No need to establish a new service, and -1 means service is established over IP layer
+    else:
+        unassigned_bitrate = env.current_service.bit_rate
+        selected_channels = []
+        # free_channels = []
+        table_id = np.where(((env.connections_detail[:, 0] == int(env.current_service.source)) & (
+                    env.connections_detail[:, 1] == int(env.current_service.destination))) | (
+                                    (env.connections_detail[:, 0] == int(env.current_service.destination)) & (
+                                        env.connections_detail[:, 1] == int(env.current_service.source))))[0][0]
+        free_channels = [[] for _ in range(env.k_paths)]
+
+        ## this could be the Shortest available path first fit solution.
+        for idp, path in enumerate(
+                env.k_shortest_paths[
+                    env.current_service.source, env.current_service.destination
+                ]
+        ):
+            for channel_number in range(
+                    0, env.topology.graph["num_channel_resources"]
+            ):
+                if env.is_channel_free(path, channel_number):
+                    mod_level = env.modulation_level[table_id][channel_number][idp]
+                    free_channels[idp].append((mod_level, channel_number, idp))
+
+                    # free_channels.append((channel_number, idp, mod_level))
+                    # selected_channels.append(channel_number)
+                    # unassigned_bitrate -= mod_level*100
+                    # if unassigned_bitrate <= 0:
+                    #     env.grooming_layer[env.current_service.source_id][env.current_service.destination_id] -= unassigned_bitrate
+                    #     return (idp, selected_channels)
+
+            # selected_channels = []
+            # unassigned_bitrate = env.current_service.bit_rate
+
+        sorted_free_channels = [sorted(row, key=lambda x: (-x[0], x[1])) for row in free_channels]
+
+        # while True:
+        #     best_channel = None
+        #     for i, (channel_index, path_id, mod_level) in enumerate(free_channels):
+        #         if best_channel is None or \
+        #                 (mod_level > best_channel[2] or
+        #                  (mod_level == best_channel[2] and path_id < best_channel[1] or
+        #                   (mod_level == best_channel[2] and path_id == best_channel[1] and channel_index < best_channel[0]))):
+        #             best_channel = (channel_index, path_id, mod_level)
+        while True:
+            max_modulation_level = float('-inf')
+            max_modulation_row_index = None
+            unassigned_bitrate = env.current_service.bit_rate
+            selected_channels = []
+            for i in range(len(sorted_free_channels) - 1, -1, -1):
+                # Check if the modulation level of the first tuple in the row is greater than or equal to the current maximum
+                if sorted_free_channels[i] ==[]:
+                    sorted_free_channels.pop(i)
+
+            if len(sorted_free_channels) > 0:
+                max_modulation_row_index = 0
+                try:
+                    max_modulation_level = sorted_free_channels[0][0][0]
+                except:
+                    aaa=1
+            if max_modulation_row_index is None:
+                return (-2, [])
+            else:
+                for channel in sorted_free_channels[max_modulation_row_index]:
+                    selected_channels.append(channel[1])
+                    unassigned_bitrate -= channel[0] * 100
+                    if unassigned_bitrate <= 0:
+                        env.grooming_layer[env.current_service.source_id][
+                            env.current_service.destination_id] -= unassigned_bitrate
+                        return (channel[2], selected_channels)
+
+                if len(sorted_free_channels) > max_modulation_row_index:
+                    sorted_free_channels.pop(max_modulation_row_index)
+                elif len(sorted_free_channels) == 0:
+                    return (-2, [])
+        return (-2, [])  # -2 means service is blocked
+
+
 def phy_aware_bmff_rmsa(env: PhyRMSAEnv) -> Tuple[int, list]:
     # first to check if we have enough resource in virtual layer
     # TODO: this is not the best way to handle the grroming layer. For example, if grooming layer has 300 Gbps, and service is 500 Gbps, then 300 can be used!
