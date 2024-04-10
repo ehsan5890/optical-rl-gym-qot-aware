@@ -98,6 +98,7 @@ class PhyRMSAEnv(OpticalNetworkEnv):
         self.number_cuts = 0
         self.rss_total_metric = 0
         self.total_path_length_episode = 0
+        self.total_path_index_episode = 0
         self.total_gsnr_episode = 0
         self.total_modulation_level_episode = 0
         self.channels_accepted_episode = 0
@@ -318,6 +319,7 @@ class PhyRMSAEnv(OpticalNetworkEnv):
             "num_defrag_cycle": self.counted_defrag_cycles,
             "avrage_gsnr": self.total_gsnr_episode/(self.channels_accepted_episode + 1),
             "average_mod_level": self.total_modulation_level_episode/(self.channels_accepted_episode+1),
+            "average_path_index": self.total_path_index_episode/( self.physical_services_accepted_episode + 1),
         }
 
         self._new_service = False
@@ -384,6 +386,7 @@ class PhyRMSAEnv(OpticalNetworkEnv):
         self.episode_services_processed = 0
         self.episode_services_accepted = 0
         self.total_path_length_episode = 0
+        self.total_path_index_episode = 0
         self.counted_defrag_cycles = 0
         self.counted_moves = 0
         self.total_gsnr_episode = 0
@@ -609,9 +612,21 @@ class PhyRMSAEnv(OpticalNetworkEnv):
         self.current_service.accepted = True
         self.services_accepted += 1
         self.episode_services_accepted += 1
+
+        for idp, serached_path in enumerate(
+                self.k_shortest_paths[
+                    self.current_service.source, self.current_service.destination
+                ]
+        ):
+            if serached_path == self.current_service.path:
+                break
+
         if not virtual:
+            if idp !=0:
+                a =3
             self.total_path_length_episode += self.current_service.path.length
-            self.physical_services_accepted_episode +=1
+            self.total_path_index_episode += idp+1
+            self.physical_services_accepted_episode += 1
         self.bit_rate_provisioned += self.current_service.bit_rate
         self.episode_bit_rate_provisioned += self.current_service.bit_rate
 
@@ -914,22 +929,33 @@ class PhyRMSAEnv(OpticalNetworkEnv):
 
         return r_spatial / (
                     self.num_spectrum_channels + self.num_spectrum_channels + self.number_spectrum_channels_s_band)
-
-    def calculate_r_cut(self, channel_number, link_indexes, defrag_flag: bool = False):
+    ## we have modified it in a way that it only considers the neighbor links for calculating the number of cuts
+    def calculate_r_cut(self, channel_number, link_indexes, defrag_flag: bool = False, path: Path = None, modified = False ):
         # defrag_flag is used to check when this function has been called, in the defragmentation process
         # or in the fragmentation aware process.
-        initial_indices, values, lengths = \
-            RMSAEnv.rle(self.topology.graph['available_channels'][:, channel_number])
-        temporary_channels = copy.deepcopy(self.topology.graph['available_channels'][:, channel_number])
-        if defrag_flag:
-            for i in link_indexes:
-                temporary_channels[i] = 1
+        if not modified:
+
+            initial_indices, values, lengths = \
+                RMSAEnv.rle(self.topology.graph['available_channels'][:, channel_number])
+            temporary_channels = copy.deepcopy(self.topology.graph['available_channels'][:, channel_number])
+            if defrag_flag:
+                for i in link_indexes:
+                    temporary_channels[i] = 1
+            else:
+                for i in link_indexes:
+                    temporary_channels[i] = 0
+            initial_indices_after, values_after, lengths_after = \
+                RMSAEnv.rle(temporary_channels)
+            return np.sum(values) - np.sum(values_after)
         else:
-            for i in link_indexes:
-                temporary_channels[i] = 0
-        initial_indices_after, values_after, lengths_after = \
-            RMSAEnv.rle(temporary_channels)
-        return np.sum(values) - np.sum(values_after)
+            indexes_set = set()
+            for i in range(len(path.node_list)-1) :
+                for node_key in self.topology[path.node_list[i]]:
+                    indexes_set.add(self.topology[path.node_list[i]][node_key]["index"])
+                    print(node_key)
+
+
+
 
     def _calculate_total_cuts(self):
         number_cut = 0
@@ -1226,7 +1252,7 @@ def phy_aware_bmfa_rmsa(env: PhyRMSAEnv) -> Tuple[int, list]:
                     links_index = []
                     for i in range(len(path.node_list) - 1):
                         links_index.append(env.topology[path.node_list[i]][path.node_list[i + 1]]["index"])
-                    fragmentation_metric = env.calculate_r_cut(channel_number, links_index)
+                    fragmentation_metric = env.calculate_r_cut(channel_number, links_index, False, path, False)
                     free_channels[idp].append((mod_level, fragmentation_metric, channel_number, idp))
 
         sorted_free_channels = [sorted(row, key=lambda x: (-x[0], -x[1])) for row in free_channels]  ## this is for bmfa
