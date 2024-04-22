@@ -320,6 +320,8 @@ class PhyRMSAEnv(OpticalNetworkEnv):
             "avrage_gsnr": self.total_gsnr_episode/(self.channels_accepted_episode + 1),
             "average_mod_level": self.total_modulation_level_episode/(self.channels_accepted_episode+1),
             "average_path_index": self.total_path_index_episode/( self.physical_services_accepted_episode + 1),
+            "path_index": self.total_path_index_episode,
+            "physical_paths":  self.physical_services_accepted_episode,
         }
 
         self._new_service = False
@@ -622,8 +624,6 @@ class PhyRMSAEnv(OpticalNetworkEnv):
                 break
 
         if not virtual:
-            if idp !=0:
-                a =3
             self.total_path_length_episode += self.current_service.path.length
             self.total_path_index_episode += idp+1
             self.physical_services_accepted_episode += 1
@@ -948,14 +948,59 @@ class PhyRMSAEnv(OpticalNetworkEnv):
                 RMSAEnv.rle(temporary_channels)
             return np.sum(values) - np.sum(values_after)
         else:
-            indexes_set = set()
-            for i in range(len(path.node_list)-1) :
+
+            temporary_channels1 = copy.deepcopy(self.topology.graph['available_channels'][:, channel_number])
+
+            number_cut_before = 0
+            number_cut_after = 0
+            for i in range(len(path.node_list)) :
                 for node_key in self.topology[path.node_list[i]]:
-                    indexes_set.add(self.topology[path.node_list[i]][node_key]["index"])
-                    print(node_key)
+                    if node_key not in path.node_list:
+                    # indexes_set.add(self.topology[path.node_list[i]][node_key]["index"])
+                        if i == len(path.node_list) -1:
+                            number_cut_before += abs(
+                                temporary_channels1[self.topology[path.node_list[i-1]][path.node_list[i]]["index"]]
+                                - temporary_channels1[self.topology[path.node_list[i]][node_key]["index"]])
+                        elif i == 0:
+                            number_cut_before += abs(temporary_channels1[self.topology[path.node_list[i]][path.node_list[i+1]]["index"]]
+                                                     -temporary_channels1[self.topology[path.node_list[i]][node_key]["index"]])
+                        else:
+                            number_cut_before += abs(
+                                temporary_channels1[self.topology[path.node_list[i]][path.node_list[i + 1]]["index"]]
+                                - temporary_channels1[self.topology[path.node_list[i]][node_key]["index"]]) + abs(
+                                temporary_channels1[self.topology[path.node_list[i-1]][path.node_list[i]]["index"]]
+                                - temporary_channels1[self.topology[path.node_list[i]][node_key]["index"]]
+                            )
 
 
+            temporary_channels2 = copy.deepcopy(self.topology.graph['available_channels'][:, channel_number])
+            if defrag_flag:
+                for i in link_indexes:
+                    temporary_channels2[i] = 1
+            else:
+                for i in link_indexes:
+                    temporary_channels2[i] = 0
 
+            for i in range(len(path.node_list)) :
+                for node_key in self.topology[path.node_list[i]]:
+                    if node_key not in path.node_list:
+                    # indexes_set.add(self.topology[path.node_list[i]][node_key]["index"])
+                        if i == len(path.node_list) -1:
+                            number_cut_after += abs(
+                                temporary_channels2[self.topology[path.node_list[i-1]][path.node_list[i]]["index"]]
+                                - temporary_channels2[self.topology[path.node_list[i]][node_key]["index"]])
+                        elif i == 0:
+                            number_cut_after += abs(temporary_channels2[self.topology[path.node_list[i]][path.node_list[i+1]]["index"]]
+                                                     -temporary_channels2[self.topology[path.node_list[i]][node_key]["index"]])
+                        else:
+                            number_cut_after += abs(
+                                temporary_channels2[self.topology[path.node_list[i]][path.node_list[i + 1]]["index"]]
+                                - temporary_channels2[self.topology[path.node_list[i]][node_key]["index"]]) + abs(
+                                temporary_channels2[self.topology[path.node_list[i-1]][path.node_list[i]]["index"]]
+                                - temporary_channels2[self.topology[path.node_list[i]][node_key]["index"]]
+                            )
+
+            return number_cut_before - number_cut_after
 
     def _calculate_total_cuts(self):
         number_cut = 0
@@ -1252,7 +1297,7 @@ def phy_aware_bmfa_rmsa(env: PhyRMSAEnv) -> Tuple[int, list]:
                     links_index = []
                     for i in range(len(path.node_list) - 1):
                         links_index.append(env.topology[path.node_list[i]][path.node_list[i + 1]]["index"])
-                    fragmentation_metric = env.calculate_r_cut(channel_number, links_index, False, path, False)
+                    fragmentation_metric = env.calculate_r_cut(channel_number, links_index, False, path, True)
                     free_channels[idp].append((mod_level, fragmentation_metric, channel_number, idp))
 
         sorted_free_channels = [sorted(row, key=lambda x: (-x[0], -x[1])) for row in free_channels]  ## this is for bmfa
