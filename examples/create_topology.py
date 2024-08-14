@@ -149,10 +149,10 @@ def get_topology(file_name, topology_name, modulations, k_paths=5):
 
 if __name__ == "__main__":
     # default values
-    k_paths = 5
+    k_paths = 3
     # topology_file = "nsfnet_chen.txt"
     topology_file = './topologies/jpn12.txt'
-
+    topology_file = './topologies/us14.txt'
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-k",

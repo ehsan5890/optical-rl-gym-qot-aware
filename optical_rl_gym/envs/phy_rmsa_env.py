@@ -10,7 +10,7 @@ import gym
 import networkx as nx
 import numpy as np
 
-from optical_rl_gym.utils import Path, Service
+from optical_rl_gym.utils import Path, Service, Transponder
 
 from .optical_network_env import OpticalNetworkEnv
 from .rmsa_env import RMSAEnv
@@ -149,6 +149,15 @@ class PhyRMSAEnv(OpticalNetworkEnv):
         self.bvts = np.zeros(
             (3, self.topology.number_of_nodes(), self.topology.number_of_nodes()), dtype=int
         )
+
+        self.c_bvt = [[[] for _ in range(self.topology.number_of_nodes())] for _ in range(self.topology.number_of_nodes())]
+        self.c_bvt_free = [[] for _ in range(self.topology.number_of_nodes())]
+
+        self.s_bvt = [[[] for _ in range(self.topology.number_of_nodes())] for _ in range(self.topology.number_of_nodes())]
+        self.s_bvt_free = [[] for _ in range(self.topology.number_of_nodes())]
+
+        self.l_bvt = [[[] for _ in range(self.topology.number_of_nodes())] for _ in range(self.topology.number_of_nodes())]
+        self.l_bvt_free = [[] for _ in range(self.topology.number_of_nodes())]
 
         self.spectrum_slots_allocation = np.full(
             (self.topology.number_of_edges(), self.num_spectrum_resources),
@@ -366,7 +375,7 @@ class PhyRMSAEnv(OpticalNetworkEnv):
                     reallocation_options_sorted = sorted(reallocation_options, key=lambda x: (-x[0], x[1]))
                     if len(reallocation_options_sorted) > 0:  # the first options is chossed to be reallocated.
                         if -1 * reallocation_options_sorted[0][0] < candidate[
-                            0]:  ## It makes sense to reallocate, since it gains in terms of number of cuts!
+                            0]:  ## It makes sense to reallocate, since it gains in terms of fragmentation metric
                             self._move(candidate[4], reallocation_options_sorted[0][1], candidate[2])
                             num_moves += 1
                             self.counted_moves += 1
@@ -554,18 +563,42 @@ class PhyRMSAEnv(OpticalNetworkEnv):
             ].append(self.current_service)
             # self._update_link_stats(path.node_list[i], path.node_list[i + 1])
 
-        for channel in channels:
+
+        tmp_modulation_level_total = 0 ## this variable is created to see how much left for the final transponder.
+        # there are smarter ways to handle it, but i did not want to change the whole code.
+
+        for i, channel in enumerate(channels):
             mod_level = self.modulation_level[table_id][channel][idp]
             gsnr = self.gsnr[table_id][channel][idp]
             self.total_gsnr_episode += gsnr
             self.total_modulation_level_episode += mod_level
             self.channels_accepted_episode += 1
-            if channel <= self.num_spectrum_channels:
-                self.bvts[1][self.current_service.source_id][self.current_service.destination_id] += 1
-            elif self.num_spectrum_channels < channel <= 2 * self.num_spectrum_channels:
-                self.bvts[0][self.current_service.source_id][self.current_service.destination_id] += 1
-            elif 2 * self.num_spectrum_channels < channel < 2 * self.num_spectrum_channels + self.number_spectrum_channels_s_band:
-                self.bvts[2][self.current_service.source_id][self.current_service.destination_id] += 1
+            if i != len(channels) - 1:
+                tmp_modulation_level_total +=mod_level
+                if channel <= self.num_spectrum_channels:
+                    self.bvts[1][self.current_service.source_id][self.current_service.destination_id] += 1
+                    # self.c_bvt[self.current_service.source_id][self.current_service.destination_id].append(Transponder(mod_level*100, 0, False))
+                elif self.num_spectrum_channels < channel <= 2 * self.num_spectrum_channels:
+                    self.bvts[0][self.current_service.source_id][self.current_service.destination_id] += 1
+                    # self.l_bvt[self.current_service.source_id][self.current_service.destination_id].append(Transponder(mod_level * 100, 0, False))
+                elif 2 * self.num_spectrum_channels < channel < 2 * self.num_spectrum_channels + self.number_spectrum_channels_s_band:
+                    self.bvts[2][self.current_service.source_id][self.current_service.destination_id] += 1
+                    # self.s_bvt[self.current_service.source_id][self.current_service.destination_id].append(Transponder(mod_level * 100, 0, False))
+            else:
+                # remained_data = self.current_service.bit_rate - 100*tmp_modulation_level_total
+                if channel <= self.num_spectrum_channels:
+                    self.bvts[1][self.current_service.source_id][self.current_service.destination_id] += 1
+                    # self.c_bvt[self.current_service.source_id][self.current_service.destination_id].append(Transponder(mod_level*100, mod_level*100- remained_data, False))
+                elif self.num_spectrum_channels < channel <= 2 * self.num_spectrum_channels:
+                    self.bvts[0][self.current_service.source_id][self.current_service.destination_id] += 1
+                    # self.l_bvt[self.current_service.source_id][self.current_service.destination_id].append(Transponder(mod_level * 100, mod_level*100- remained_data, False))
+                elif 2 * self.num_spectrum_channels < channel < 2 * self.num_spectrum_channels + self.number_spectrum_channels_s_band:
+                    self.bvts[2][self.current_service.source_id][self.current_service.destination_id] += 1
+                    # self.s_bvt[self.current_service.source_id][self.current_service.destination_id].append(Transponder(mod_level * 100, mod_level*100- remained_data, False))
+
+
+
+
 
         self.topology.graph["running_services"].append(self.current_service)
         self.current_service.path = path

@@ -158,3 +158,23 @@ def evaluate_heuristic(
     if return_episode_rewards:
         return episode_rewards, episode_lengths
     return mean_reward, std_reward
+
+
+class Transponder:
+    def __init__(self, capacity, empty=True):
+        self.capacity = capacity
+        self.available_capacity = capacity
+        self.empty = empty
+
+    def use_capacity(self, amount):
+        if amount > self.available_capacity:
+            raise ValueError("Not enough available capacity")
+        self.available_capacity -= amount
+
+    def release_capacity(self, amount):
+        if self.available_capacity + amount > self.capacity:
+            raise ValueError("Releasing more capacity than total capacity")
+        self.available_capacity += amount
+
+    def __repr__(self):
+        return f"Transponder(band={self.band}, capacity={self.capacity}, available_capacity={self.available_capacity})"
