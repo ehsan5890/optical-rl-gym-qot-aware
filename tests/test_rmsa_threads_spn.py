@@ -25,37 +25,37 @@ import copy
 # logging.getLogger("rmsaenv").setLevel(logging.INFO)
 
 seed = 20
-episodes = 150
-episode_length =80
+episodes = 500
+episode_length =200
 
 monitor_files = []
 policies = []
 
-logging_dir = "../examples/phy_frag_rmsa/us-results"
+logging_dir = "../examples/phy_frag_rmsa/spn-results"
 os.makedirs(logging_dir, exist_ok=True)
 
 
 # topology_name = 'gbn'
 # topology_name = 'nobel-us'
 # topology_name = 'germany50'
-topology_name='us14'
+topology_name='spn'
 # topology_name='nsfnet_chen'
 with open(
     os.path.join("..", "examples", "topologies", f"{topology_name}_3-paths_6-modulations.h5"), "rb"
 ) as f:
     topology = pickle.load(f)
 
-mat_file3 = loadmat('../examples/inputs/Results_K3SP_FRP_SLC_CBG_USB14.mat')
+mat_file3 = loadmat('../examples/inputs/Results_K3SP_FRP_SLC_CBG_SPN30.mat')
 
 # US data info
-us_data = mat_file3['Results_K3SP_FRP_SLC_CBG_USB14']
-modulation_us = us_data[0][0][1]
-gsnr_us = us_data[0][0][2]
-all_connections_us = us_data[0][0][0]
+spn_data = mat_file3['Results_K3SP_FRP_SLC_CBG_SPN30']
+modulation_spn = spn_data[0][0][1]
+gsnr_spn = spn_data[0][0][2]
+all_connections_spn = spn_data[0][0][0]
 
-min_load = 500
-max_load = 501
-step_length = 10
+min_load = 2400
+max_load = 3402
+step_length = 200
 steps = int((max_load - min_load)/step_length) +1
 
 def run_with_callback(callback, env_args, num_eps, log_dir):
@@ -112,9 +112,9 @@ if __name__ == '__main__':
             episode_length=episode_length,
             num_spectrum_resources=64,
             bit_rate_selection="discrete",
-            modulation_level=modulation_us,
-            connections_detail=all_connections_us,
-            gsnr=gsnr_us,
+            modulation_level=modulation_spn,
+            connections_detail=all_connections_spn,
+            gsnr=gsnr_spn,
             number_spectrum_channels=80,
             number_spectrum_channels_s_band=108,
         )
@@ -155,9 +155,9 @@ if __name__ == '__main__':
             episode_length=episode_length,
             num_spectrum_resources=64,
             bit_rate_selection="discrete",
-            modulation_level=modulation_us,
-            connections_detail=all_connections_us,
-            gsnr=gsnr_us,
+            modulation_level=modulation_spn,
+            connections_detail=all_connections_spn,
+            gsnr=gsnr_spn,
             number_spectrum_channels=80,
             number_spectrum_channels_s_band=108,
             defrag_period=10,
@@ -190,9 +190,9 @@ if __name__ == '__main__':
             episode_length=episode_length,
             num_spectrum_resources=64,
             bit_rate_selection="discrete",
-            modulation_level=modulation_us,
-            connections_detail=all_connections_us,
-            gsnr=gsnr_us,
+            modulation_level=modulation_spn,
+            connections_detail=all_connections_spn,
+            gsnr=gsnr_spn,
             number_spectrum_channels=80,
             number_spectrum_channels_s_band=108,
             defrag_period=10,
