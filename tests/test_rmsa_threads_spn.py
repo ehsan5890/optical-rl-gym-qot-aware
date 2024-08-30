@@ -53,9 +53,9 @@ modulation_spn = spn_data[0][0][1]
 gsnr_spn = spn_data[0][0][2]
 all_connections_spn = spn_data[0][0][0]
 
-min_load = 2400
-max_load = 3402
-step_length = 200
+min_load = 3000
+max_load = 3302
+step_length = 100
 steps = int((max_load - min_load)/step_length) +1
 
 def run_with_callback(callback, env_args, num_eps, log_dir):
@@ -128,23 +128,23 @@ if __name__ == '__main__':
         # p.start()
         # processes.append(p)
         #
-        # p = Process(target=run_with_callback, args=(phy_aware_bmff_rmsa, copy.deepcopy(env_args), episodes,log_dir))
-        # p.start()
-        # processes.append(p)
+       # p = Process(target=run_with_callback, args=(phy_aware_bmff_rmsa, copy.deepcopy(env_args), episodes,log_dir))
+       # p.start()
+       # processes.append(p)
 
 
-        # p = Process(target=run_with_callback, args=(phy_aware_bmfa_rmsa, copy.deepcopy(env_args), episodes,log_dir))
-        # p.start()
-        # processes.append(p)
+       # p = Process(target=run_with_callback, args=(phy_aware_bmfa_rmsa, copy.deepcopy(env_args), episodes,log_dir))
+       # p.start()
+       # processes.append(p)
 
 
-        p = Process(target=run_with_callback, args=(phy_aware_bmfa_rss_rmsa, copy.deepcopy(env_args), episodes,log_dir))
-        p.start()
-        processes.append(p)
+       # p = Process(target=run_with_callback, args=(phy_aware_bmfa_rss_rmsa, copy.deepcopy(env_args), episodes,log_dir))
+       # p.start()
+       # processes.append(p)
 
-        p = Process(target=run_with_callback, args=(phy_aware_sapbm_rmsa, copy.deepcopy(env_args), episodes,log_dir))
-        p.start()
-        processes.append(p)
+       # p = Process(target=run_with_callback, args=(phy_aware_sapbm_rmsa, copy.deepcopy(env_args), episodes,log_dir))
+       # p.start()
+       # processes.append(p)
 
         env_args_defrag = dict(
             topology=topology,
@@ -165,13 +165,13 @@ if __name__ == '__main__':
 
         )
         #
-        log_dir = f'{logging_dir}/logs_{load}_{episode_length}-defragmeentation/'
+        log_dir = f'{logging_dir}/logs_{load}_{episode_length}-defragmeentation-v3/'
         os.makedirs(log_dir, exist_ok=True)
 
 
-        # p = Process(target=run_with_callback, args=(phy_aware_sapff_rmsa, copy.deepcopy(env_args_defrag), episodes,log_dir))
-        # p.start()
-        # processes.append(p)
+        p = Process(target=run_with_callback, args=(phy_aware_bmff_rmsa, copy.deepcopy(env_args_defrag), episodes,log_dir))
+        p.start()
+        processes.append(p)
         #
         #
         #
@@ -201,11 +201,11 @@ if __name__ == '__main__':
 
         )
 
-        # p = Process(target=run_with_callback, args=(phy_aware_bmfa_rss_rmsa, copy.deepcopy(env_args_defrag_rss), episodes,log_dir))
-        # p.start()
-        # processes.append(p)
+       # p = Process(target=run_with_callback, args=(phy_aware_bmfa_rss_rmsa, copy.deepcopy(env_args_defrag_rss), episodes,log_dir))
+       # p.start()
+       # processes.append(p)
 
-        # p = Process(target=run_with_callback, args=(phy_aware_bmff_rmsa, copy.deepcopy(env_args_defrag_rss), episodes,log_dir))
-        # p.start()
-        # processes.append(p)
+       # p = Process(target=run_with_callback, args=(phy_aware_bmff_rmsa, copy.deepcopy(env_args_defrag_rss), episodes,log_dir))
+       # p.start()
+       # processes.append(p)
     [p.join() for p in processes]  # wait for the completion of all processes

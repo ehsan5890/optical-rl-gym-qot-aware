@@ -367,11 +367,25 @@ class PhyRMSAEnv(OpticalNetworkEnv):
                             0, self.topology.graph["num_channel_resources"]
                     ):
                         if self.is_channel_free(candidate[4].path, channel_number):
-                            if self.metric == 'cut':
-                                fragmentation_metric = self.calculate_r_cut(channel_number, candidate[3])
-                            else:
-                                fragmentation_metric = self.calculate_r_spatial(channel_number, candidate[3])
-                            reallocation_options.append((fragmentation_metric, channel_number))
+                            table_id = np.where(((self.connections_detail[:, 0] == int(candidate[4].source)) & (
+                                    self.connections_detail[:, 1] == int(candidate[4].destination))) | (
+                                                        (self.connections_detail[:, 0] == int(
+                                                            candidate[4].destination)) & (
+                                                                self.connections_detail[:, 1] == int(
+                                                            candidate[4].source))))[0][0]
+                            for idp, serached_path in enumerate(
+                                    self.k_shortest_paths[
+                                        self.current_service.source, self.current_service.destination
+                                    ]
+                            ):
+                                if serached_path == path:
+                                    break
+                            if self.modulation_level[table_id][channel_number][idp] >= self.modulation_level[table_id][candidate[2]][idp]:
+                                if self.metric == 'cut':
+                                    fragmentation_metric = self.calculate_r_cut(channel_number, candidate[3])
+                                else:
+                                    fragmentation_metric = self.calculate_r_spatial(channel_number, candidate[3])
+                                reallocation_options.append((fragmentation_metric, channel_number))
                     reallocation_options_sorted = sorted(reallocation_options, key=lambda x: (-x[0], x[1]))
                     if len(reallocation_options_sorted) > 0:  # the first options is chossed to be reallocated.
                         if -1 * reallocation_options_sorted[0][0] < candidate[

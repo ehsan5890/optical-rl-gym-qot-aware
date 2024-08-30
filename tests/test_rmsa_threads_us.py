@@ -25,8 +25,8 @@ import copy
 # logging.getLogger("rmsaenv").setLevel(logging.INFO)
 
 seed = 20
-episodes = 150
-episode_length =80
+episodes = 1000
+episode_length =200
 
 monitor_files = []
 policies = []
@@ -53,9 +53,9 @@ modulation_us = us_data[0][0][1]
 gsnr_us = us_data[0][0][2]
 all_connections_us = us_data[0][0][0]
 
-min_load = 500
-max_load = 501
-step_length = 10
+min_load = 1350
+max_load = 1501
+step_length = 50
 steps = int((max_load - min_load)/step_length) +1
 
 def run_with_callback(callback, env_args, num_eps, log_dir):
@@ -138,13 +138,13 @@ if __name__ == '__main__':
         # processes.append(p)
 
 
-        p = Process(target=run_with_callback, args=(phy_aware_bmfa_rss_rmsa, copy.deepcopy(env_args), episodes,log_dir))
-        p.start()
-        processes.append(p)
+        #p = Process(target=run_with_callback, args=(phy_aware_bmfa_rss_rmsa, copy.deepcopy(env_args), episodes,log_dir))
+        #p.start()
+        #processes.append(p)
 
-        p = Process(target=run_with_callback, args=(phy_aware_sapbm_rmsa, copy.deepcopy(env_args), episodes,log_dir))
-        p.start()
-        processes.append(p)
+        #p = Process(target=run_with_callback, args=(phy_aware_sapbm_rmsa, copy.deepcopy(env_args), episodes,log_dir))
+        #p.start()
+        #processes.append(p)
 
         env_args_defrag = dict(
             topology=topology,
@@ -165,7 +165,7 @@ if __name__ == '__main__':
 
         )
         #
-        log_dir = f'{logging_dir}/logs_{load}_{episode_length}-defragmeentation/'
+        log_dir = f'{logging_dir}/logs_{load}_{episode_length}-defragmeentation-v3/'
         os.makedirs(log_dir, exist_ok=True)
 
 
@@ -201,9 +201,9 @@ if __name__ == '__main__':
 
         )
 
-        # p = Process(target=run_with_callback, args=(phy_aware_bmfa_rss_rmsa, copy.deepcopy(env_args_defrag_rss), episodes,log_dir))
-        # p.start()
-        # processes.append(p)
+        #p = Process(target=run_with_callback, args=(phy_aware_bmfa_rss_rmsa, copy.deepcopy(env_args_defrag_rss), episodes,log_dir))
+        #p.start()
+        #processes.append(p)
 
         # p = Process(target=run_with_callback, args=(phy_aware_bmff_rmsa, copy.deepcopy(env_args_defrag_rss), episodes,log_dir))
         # p.start()
