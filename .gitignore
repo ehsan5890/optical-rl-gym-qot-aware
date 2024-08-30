@@ -1,7 +1,8 @@
 # outputs of the algorithms
 tb
 tmp
-
+.csv
+*.csv
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
