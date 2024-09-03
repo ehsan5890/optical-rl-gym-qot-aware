@@ -352,13 +352,17 @@ class PhyRMSAEnv(OpticalNetworkEnv):
                             self.topology[service.path.node_list[i]][service.path.node_list[i + 1]]["index"])
                     for channel in service.channels:
                         if self.metric == 'cut':
-                            defrag_candidates.append((self.calculate_r_cut(channel, links_indexes, True),
-                                                      self.current_time - service.arrival_time, channel,
-                                                      links_indexes, service))
+                            cut_diff = self.calculate_r_cut(channel, links_indexes, True)
+                            if cut_diff > 0:
+                                defrag_candidates.append((cut_diff,
+                                                          self.current_time - service.arrival_time, channel,
+                                                          links_indexes, service))
                         else:
-                            defrag_candidates.append((self.calculate_r_spatial(channel, links_indexes, True),
-                                                      self.current_time - service.arrival_time, channel,
-                                                      links_indexes, service))
+                            rss_diff = self.calculate_r_spatial(channel, links_indexes, True)
+                            if rss_diff > 0:
+                                defrag_candidates.append((rss_diff,
+                                                          self.current_time - service.arrival_time, channel,
+                                                          links_indexes, service))
                 sorted_defrag_candidates = sorted(defrag_candidates, key=lambda x: (-x[0], -x[1]))
                 num_moves = 0
                 for i, candidate in enumerate(sorted_defrag_candidates):
@@ -380,7 +384,7 @@ class PhyRMSAEnv(OpticalNetworkEnv):
                             ):
                                 if serached_path == path:
                                     break
-                            if self.modulation_level[table_id][channel_number][idp] >= self.modulation_level[table_id][candidate[2]][idp]:
+                            if self.modulation_level[table_id][channel_number][idp] == self.modulation_level[table_id][candidate[2]][idp]:
                                 if self.metric == 'cut':
                                     fragmentation_metric = self.calculate_r_cut(channel_number, candidate[3])
                                 else:

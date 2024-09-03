@@ -38,7 +38,7 @@ os.makedirs(logging_dir, exist_ok=True)
 topology_name = 'jpn12'
 # topology_name='nsfnet_chen'
 with open(
-        os.path.join("..", "examples", "topologies", f"{topology_name}_3-paths_6-modulations.h5"), "rb"
+        os.path.join("..", "examples", "topologies", f"{topology_name}_5-paths_6-modulations.h5"), "rb"
 ) as f:
     topology = pickle.load(f)
 
