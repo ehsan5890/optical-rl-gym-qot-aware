@@ -53,16 +53,16 @@ gsnr_jpn12 = mat_file1['GSNR_connection_JPN12_k7SP_CHBFullyLoaded_SCL_Uniform']
 all_connections_jpn12 = mat_file2['All_connections_Profile_JPN12_k7SP_CHBFullyLoaded_SCL_Uniform']
 
 # US data info
-us_data = mat_file3['Results_K3SP_FRP_SLC_CBG_USB14']
-modulation_us = us_data[0][0][1]
-gsnr_us = us_data[0][0][2]
-all_connections_us = us_data[0][0][0]
-
-# spain data info
-sp_data = mat_file4['Results_K3SP_FRP_SLC_CBG_SPN30']
-modulation_sp = sp_data[0][0][1]
-gsnr_sp = sp_data[0][0][2]
-all_connections_sp = sp_data[0][0][0]
+# us_data = mat_file3['Results_K3SP_FRP_SLC_CBG_USB14']
+# modulation_us = us_data[0][0][1]
+# gsnr_us = us_data[0][0][2]
+# all_connections_us = us_data[0][0][0]
+#
+# # spain data info
+# sp_data = mat_file4['Results_K3SP_FRP_SLC_CBG_SPN30']
+# modulation_sp = sp_data[0][0][1]
+# gsnr_sp = sp_data[0][0][2]
+# all_connections_sp = sp_data[0][0][0]
 
 
 min_load = 1300

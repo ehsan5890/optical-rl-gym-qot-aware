@@ -165,7 +165,7 @@ if __name__ == '__main__':
 
         )
         #
-        log_dir = f'{logging_dir}/logs_{load}_{episode_length}-defragmeentation-v3/'
+        log_dir = f'{logging_dir}/logs_{load}_{episode_length}-defragmeentation-cut/'
         os.makedirs(log_dir, exist_ok=True)
 
 
@@ -200,10 +200,12 @@ if __name__ == '__main__':
             metric='rss'
 
         )
+        log_dir = f'{logging_dir}/logs_{load}_{episode_length}-defragmeentation-rss/'
+        os.makedirs(log_dir, exist_ok=True)
 
-        #p = Process(target=run_with_callback, args=(phy_aware_bmfa_rss_rmsa, copy.deepcopy(env_args_defrag_rss), episodes,log_dir))
-        #p.start()
-        #processes.append(p)
+        p = Process(target=run_with_callback, args=(phy_aware_bmfa_rss_rmsa, copy.deepcopy(env_args_defrag_rss), episodes,log_dir))
+        p.start()
+        processes.append(p)
 
         # p = Process(target=run_with_callback, args=(phy_aware_bmff_rmsa, copy.deepcopy(env_args_defrag_rss), episodes,log_dir))
         # p.start()
