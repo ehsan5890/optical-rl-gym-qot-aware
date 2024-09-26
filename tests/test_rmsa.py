@@ -8,8 +8,6 @@ import numpy as np
 from stable_baselines3.common.monitor import Monitor
 from scipy.io import loadmat
 from optical_rl_gym.envs.phy_rmsa_env import (
-    shortest_available_path_first_fit,
-    phy_aware_sapff_rmsa,
     phy_aware_bmff_rmsa,
     phy_aware_bmfa_rmsa,
     phy_aware_bmfa_rss_rmsa,
@@ -23,7 +21,7 @@ from optical_rl_gym.utils import evaluate_heuristic, random_policy
 
 seed = 20
 episodes = 1
-episode_length = 1000
+episode_length = 5000
 
 monitor_files = []
 policies = []
@@ -38,19 +36,20 @@ os.makedirs(logging_dir, exist_ok=True)
 topology_name='jpn12'
 # topology_name='nsfnet_chen'
 with open(
-    os.path.join("..", "examples", "topologies", f"{topology_name}_5-paths_6-modulations.h5"), "rb"
+    os.path.join("..", "examples", "topologies", f"{topology_name}_3-paths_6-modulations.h5"), "rb"
 ) as f:
     topology = pickle.load(f)
 
-mat_file = loadmat('../examples/inputs/Modulation_connection_JPN12_k7SP_CHBFullyLoaded_SCL_Uniform.mat')
-mat_file1 = loadmat('../examples/inputs/GSNR_connection_JPN12_k7SP_CHBFullyLoaded_SCL_Uniform.mat')
-mat_file2 = loadmat('../examples/inputs/All_connections_Profile_JPN12_k7SP_CHBFullyLoaded_SCL_Uniform.mat')
+# mat_file = loadmat('../examples/inputs/Modulation_connection_JPN12_k7SP_CHBFullyLoaded_SCL_Uniform.mat')
+# mat_file1 = loadmat('../examples/inputs/GSNR_connection_JPN12_k7SP_CHBFullyLoaded_SCL_Uniform.mat')
+# mat_file2 = loadmat('../examples/inputs/All_connections_Profile_JPN12_k7SP_CHBFullyLoaded_SCL_Uniform.mat')
 mat_file3 = loadmat('../examples/inputs/Results_K3SP_FRP_SLC_CBG_USB14.mat')
 mat_file4 = loadmat('../examples/inputs/Results_K3SP_FRP_SLC_CBG_SPN30.mat')
+mat_file5 = loadmat('../examples/inputs/Results_K3SP_FRP_SLC_CBG_JPN12.mat')
 
-modulation_jpn12 = mat_file['Modulation_connection_JPN12_k7SP_CHBFullyLoaded_SCL_Uniform']
-gsnr_jpn12 = mat_file1['GSNR_connection_JPN12_k7SP_CHBFullyLoaded_SCL_Uniform']
-all_connections_jpn12 = mat_file2['All_connections_Profile_JPN12_k7SP_CHBFullyLoaded_SCL_Uniform']
+# modulation_jpn12 = mat_file['Modulation_connection_JPN12_k7SP_CHBFullyLoaded_SCL_Uniform']
+# gsnr_jpn12 = mat_file1['GSNR_connection_JPN12_k7SP_CHBFullyLoaded_SCL_Uniform']
+# all_connections_jpn12 = mat_file2['All_connections_Profile_JPN12_k7SP_CHBFullyLoaded_SCL_Uniform']
 
 # US data info
 # us_data = mat_file3['Results_K3SP_FRP_SLC_CBG_USB14']
@@ -63,6 +62,13 @@ all_connections_jpn12 = mat_file2['All_connections_Profile_JPN12_k7SP_CHBFullyLo
 # modulation_sp = sp_data[0][0][1]
 # gsnr_sp = sp_data[0][0][2]
 # all_connections_sp = sp_data[0][0][0]
+
+# JPN data info
+jpn_data = mat_file5['Results_K3SP_FRP_SLC_CBG_JPN12']
+modulation_jpn12 = jpn_data[0][0][1]
+gsnr_jpn12 = jpn_data[0][0][2]
+all_connections_jpn12 = jpn_data[0][0][0]
+
 
 
 min_load = 1300
@@ -84,8 +90,8 @@ for load_counter, load in enumerate(range(min_load,max_load,step_length)):
         modulation_level=modulation_jpn12,
         connections_detail=all_connections_jpn12,
         gsnr=gsnr_jpn12,
-        number_spectrum_channels=10,
-        number_spectrum_channels_s_band=10,
+        number_spectrum_channels=80,
+        number_spectrum_channels_s_band=108,
 
     )
 
@@ -137,7 +143,7 @@ for load_counter, load in enumerate(range(min_load,max_load,step_length)):
     # env_phy_bmfa_cut_df = gym.make("PhyRMSA-v0", **env_args)
     # env_phy_bmfa_cut_df = Monitor(env_phy_bmfa_cut_df, log_dir + 'BM-FA-Cut', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
     #                                                                                          'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
-    #                                                                                          'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length', 'avrage_gsnr', 'average_mod_level'))
+    #                                                                                          'total_path_length', 'avrage_gsnr', 'average_mod_level'))
     # mean_reward_sp, std_reward_sp = evaluate_heuristic(
     #     env_phy_bmfa_cut_df, phy_aware_bmfa_rmsa, n_eval_episodes=episodes
     # )
@@ -179,25 +185,25 @@ for load_counter, load in enumerate(range(min_load,max_load,step_length)):
 
 
 
-    # env_phy_bmfa_rss_df = gym.make("PhyRMSA-v0", **env_args)
-    #
-    # env_phy_bmfa_rss_df = Monitor(env_phy_bmfa_rss_df, log_dir + 'BM-FA-RSS', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
-    #                                                                                          'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
-    #                                                                                          'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length'))
-    # mean_reward_sp, std_reward_sp = evaluate_heuristic(
-    #     env_phy_bmfa_rss_df, phy_aware_bmfa_rss_rmsa, n_eval_episodes=episodes
-    # )
-    # print("BM-FA-Rss:".ljust(8), f"{mean_reward_sp:.4f}  {std_reward_sp:<7.4f}")
-    # print(
-    #     "\tBit rate blocking:",
-    #     (env_phy_bmfa_rss_df.episode_bit_rate_requested - env_phy_bmfa_rss_df.episode_bit_rate_provisioned)
-    #     / env_phy_bmfa_rss_df.episode_bit_rate_requested,
-    # )
-    # print(
-    #     "\tRequest blocking:",
-    #     (env_phy_bmfa_rss_df.episode_services_processed - env_phy_bmfa_rss_df.episode_services_accepted)
-    #     / env_phy_bmfa_rss_df.episode_services_processed,
-    # )
+    env_phy_bmfa_rss_df = gym.make("PhyRMSA-v0", **env_args)
+
+    env_phy_bmfa_rss_df = Monitor(env_phy_bmfa_rss_df, log_dir + 'BM-FA-RSS', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
+                                                                                             'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
+                                                                                             'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length'))
+    mean_reward_sp, std_reward_sp = evaluate_heuristic(
+        env_phy_bmfa_rss_df, phy_aware_bmfa_rss_rmsa, n_eval_episodes=episodes
+    )
+    print("BM-FA-Rss:".ljust(8), f"{mean_reward_sp:.4f}  {std_reward_sp:<7.4f}")
+    print(
+        "\tBit rate blocking:",
+        (env_phy_bmfa_rss_df.episode_bit_rate_requested - env_phy_bmfa_rss_df.episode_bit_rate_provisioned)
+        / env_phy_bmfa_rss_df.episode_bit_rate_requested,
+    )
+    print(
+        "\tRequest blocking:",
+        (env_phy_bmfa_rss_df.episode_services_processed - env_phy_bmfa_rss_df.episode_services_accepted)
+        / env_phy_bmfa_rss_df.episode_services_processed,
+    )
 
 
 
@@ -220,21 +226,21 @@ for load_counter, load in enumerate(range(min_load,max_load,step_length)):
 
     )
 
-    env_phy_bmfa_cut_df = gym.make("PhyRMSA-v0", **env_args_defrag)
-    env_phy_bmfa_cut_df = Monitor(env_phy_bmfa_cut_df, log_dir + 'BM-FA-Cut', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
-                                                                                             'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
-                                                                                             'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length'))
-    mean_reward_sp, std_reward_sp = evaluate_heuristic(
-        env_phy_bmfa_cut_df, phy_aware_bmfa_rmsa, n_eval_episodes=episodes
-    )
-    print("BM-FA-defrag:".ljust(8), f"{mean_reward_sp:.4f}  {std_reward_sp:<7.4f}")
-    print(
-        "\tBit rate blocking:",
-        (env_phy_bmfa_cut_df.episode_bit_rate_requested - env_phy_bmfa_cut_df.episode_bit_rate_provisioned)
-        / env_phy_bmfa_cut_df.episode_bit_rate_requested,
-    )
-    print(
-        "\tRequest blocking:",
-        (env_phy_bmfa_cut_df.episode_services_processed - env_phy_bmfa_cut_df.episode_services_accepted)
-        / env_phy_bmfa_cut_df.episode_services_processed,
-    )
+    # env_phy_bmfa_cut_df = gym.make("PhyRMSA-v0", **env_args_defrag)
+    # env_phy_bmfa_cut_df = Monitor(env_phy_bmfa_cut_df, log_dir + 'BM-FA-Cut', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
+    #                                                                                          'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
+    #                                                                                           'total_path_length'))
+    # mean_reward_sp, std_reward_sp = evaluate_heuristic(
+    #     env_phy_bmfa_cut_df, phy_aware_bmfa_rmsa, n_eval_episodes=episodes
+    # )
+    # print("BM-FA-defrag:".ljust(8), f"{mean_reward_sp:.4f}  {std_reward_sp:<7.4f}")
+    # print(
+    #     "\tBit rate blocking:",
+    #     (env_phy_bmfa_cut_df.episode_bit_rate_requested - env_phy_bmfa_cut_df.episode_bit_rate_provisioned)
+    #     / env_phy_bmfa_cut_df.episode_bit_rate_requested,
+    # )
+    # print(
+    #     "\tRequest blocking:",
+    #     (env_phy_bmfa_cut_df.episode_services_processed - env_phy_bmfa_cut_df.episode_services_accepted)
+    #     / env_phy_bmfa_cut_df.episode_services_processed,
+    # )

@@ -34,7 +34,7 @@ class PhyRMSAEnv(OpticalNetworkEnv):
             mean_service_holding_time: float = 10800.0,
             num_spectrum_resources: int = 100,
             bit_rate_selection: str = "discrete",
-            bit_rates: Sequence = [50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600],
+            bit_rates: Sequence = [ 100, 200, 300, 400, 500, 600], #[50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600],
             bit_rate_probabilities: Optional[np.array] = None,
             node_request_probabilities: Optional[np.array] = None,
             bit_rate_lower_bound: float = 25.0,
@@ -102,6 +102,7 @@ class PhyRMSAEnv(OpticalNetworkEnv):
         self.total_gsnr_episode = 0
         self.total_modulation_level_episode = 0
         self.channels_accepted_episode = 0
+        self.services_accepted_virtual = 0
         self.physical_services_accepted_episode = 0
         self.counted_moves = 0
         self.counted_defrag_cycles = 0
@@ -143,21 +144,27 @@ class PhyRMSAEnv(OpticalNetworkEnv):
             (self.topology.number_of_edges(), self.num_spectrum_resources), dtype=int
         )
         self.grooming_layer = np.zeros(
-            (self.topology.number_of_nodes(), self.topology.number_of_nodes()), dtype=int
+            (self.topology.number_of_nodes(), self.topology.number_of_nodes(), self.k_paths), dtype=int
         )
         ## here 1: BVTs in C band, 0: BVTs in L band, 2: BVTs in S band
         self.bvts = np.zeros(
             (3, self.topology.number_of_nodes(), self.topology.number_of_nodes()), dtype=int
         )
 
-        self.c_bvt = [[[] for _ in range(self.topology.number_of_nodes())] for _ in range(self.topology.number_of_nodes())]
-        self.c_bvt_free = [[] for _ in range(self.topology.number_of_nodes())]
+        # self.c_bvt = [[[] for _ in range(self.topology.number_of_nodes())] for _ in range(self.topology.number_of_nodes())]
+        # self.c_bvt_free = [[] for _ in range(self.topology.number_of_nodes())]
+        #
+        # self.s_bvt = [[[] for _ in range(self.topology.number_of_nodes())] for _ in range(self.topology.number_of_nodes())]
+        # self.s_bvt_free = [[] for _ in range(self.topology.number_of_nodes())]
+        #
+        # self.l_bvt = [[[] for _ in range(self.topology.number_of_nodes())] for _ in range(self.topology.number_of_nodes())]
+        # self.l_bvt_free = [[] for _ in range(self.topology.number_of_nodes())]
 
-        self.s_bvt = [[[] for _ in range(self.topology.number_of_nodes())] for _ in range(self.topology.number_of_nodes())]
-        self.s_bvt_free = [[] for _ in range(self.topology.number_of_nodes())]
-
-        self.l_bvt = [[[] for _ in range(self.topology.number_of_nodes())] for _ in range(self.topology.number_of_nodes())]
-        self.l_bvt_free = [[] for _ in range(self.topology.number_of_nodes())]
+        self.channel_state = np.empty((self.topology.number_of_nodes(), self.topology.number_of_nodes(), self.k_paths), dtype=object)
+        for i in range(self.topology.number_of_nodes()):
+            for j in range(self.topology.number_of_nodes()):
+                for k in range(self.k_paths):
+                    self.channel_state[i, j, k] = [] # the list consider tuples with (channel number, used by this connection , free, capacity, bool: True establish a connection, and false uses a connection)
 
         self.spectrum_slots_allocation = np.full(
             (self.topology.number_of_edges(), self.num_spectrum_resources),
@@ -172,6 +179,14 @@ class PhyRMSAEnv(OpticalNetworkEnv):
                 fill_value=-1,
                 dtype=int,
             )
+
+            self.spectrum_channels_available = np.full(
+                (
+                self.topology.number_of_edges(), 2 * self.num_spectrum_channels + self.number_spectrum_channels_s_band),
+                fill_value=-1,
+                dtype=int,
+            )
+
             self.topology.graph["available_channels"] = np.ones(
                 (self.topology.number_of_edges(),
                  2 * self.num_spectrum_channels + self.number_spectrum_channels_s_band),
@@ -180,6 +195,13 @@ class PhyRMSAEnv(OpticalNetworkEnv):
         else:
             if self._l_band:
                 self.spectrum_channels_allocation = np.full(
+                    (self.topology.number_of_edges(),
+                     2 * self.num_spectrum_channels),
+                    fill_value=-1,
+                    dtype=int,
+                )
+
+                self.spectrum_channels_available = np.full(
                     (self.topology.number_of_edges(),
                      2 * self.num_spectrum_channels),
                     fill_value=-1,
@@ -197,6 +219,14 @@ class PhyRMSAEnv(OpticalNetworkEnv):
                     fill_value=-1,
                     dtype=int,
                 )
+
+                self.spectrum_channels_available = np.full(
+                    (self.topology.number_of_edges(),
+                     self.num_spectrum_channels),
+                    fill_value=-1,
+                    dtype=int,
+                )
+
                 self.topology.graph["available_channels"] = np.ones(
                     (self.topology.number_of_edges(),
                      self.num_spectrum_channels),
@@ -252,8 +282,15 @@ class PhyRMSAEnv(OpticalNetworkEnv):
         if (
                 path != -2
         ):  # action is for assigning a path
-            if path == -1:  ## service is allocated using virtual layer
+            if path > 10:  ## service is allocated using virtual layer
+                self.services_accepted_virtual +=1
                 self._service_acceptance(True)
+                self._provision_virtual_path(
+                    self.k_shortest_paths[
+                        self.current_service.source, self.current_service.destination
+                    ][path-20],  # I wanted to know if this is virtual path or not
+                    selected_channels
+                )
             else:
                 self.logger.debug(
                     "{} processing action {} path {} and initial slot {} for {} slots".format(
@@ -275,23 +312,20 @@ class PhyRMSAEnv(OpticalNetworkEnv):
                     self._service_acceptance(False)
 
                 self._add_release(self.current_service)
-        else:
-            a = 1
         self.topology.graph["services"].append(self.current_service)
 
         # generating statistics for the episode info
-        if self.bit_rate_selection == "discrete":
-            blocking_per_bit_rate = {}
-            for bit_rate in self.bit_rates:
-                if self.bit_rate_requested_histogram[bit_rate] > 0:
-                    # computing the blocking rate per bit rate requested in the increasing order of bit rate
-                    blocking_per_bit_rate[bit_rate] = (
-                                                              self.bit_rate_requested_histogram[bit_rate]
-                                                              - self.bit_rate_provisioned_histogram[bit_rate]
-                                                      ) / self.bit_rate_requested_histogram[bit_rate]
-                else:
-                    blocking_per_bit_rate[bit_rate] = 0.0
-
+        # if self.bit_rate_selection == "discrete":
+        #     blocking_per_bit_rate = {}
+        #     for bit_rate in self.bit_rates:
+        #         if self.bit_rate_requested_histogram[bit_rate] > 0:
+        #             # computing the blocking rate per bit rate requested in the increasing order of bit rate
+        #             blocking_per_bit_rate[bit_rate] = (
+        #                                                       self.bit_rate_requested_histogram[bit_rate]
+        #                                                       - self.bit_rate_provisioned_histogram[bit_rate]
+        #                                               ) / self.bit_rate_requested_histogram[bit_rate]
+        #         else:
+        #             blocking_per_bit_rate[bit_rate] = 0.0
         # cur_network_compactness = (
         #     self._get_network_compactness()
         # )  # measuring compactness after the provisioning
@@ -301,7 +335,6 @@ class PhyRMSAEnv(OpticalNetworkEnv):
         # self.total_path_length = 0
         # for service in self.topology.graph["running_services"]: ## It is not the best way.
         #     self.total_path_length += service.path.length
-
         reward = self.reward()
         info = {
             "service_blocking_rate": (self.services_processed - self.services_accepted)
@@ -320,9 +353,9 @@ class PhyRMSAEnv(OpticalNetworkEnv):
                                               / self.episode_bit_rate_requested,
             "number_cuts_total": self.number_cuts,
             "rss_total_metric": self.rss_total_metric,
-            "C_BVTs": np.sum(self.bvts[1]) / (self.services_accepted + 1),
-            "L_BVTs": np.sum(self.bvts[0]) / (self.services_accepted + 1),
-            "S_BVTs": np.sum(self.bvts[2]) / (self.services_accepted + 1),
+            # "C_BVTs": np.sum(self.bvts[1]) / (self.services_accepted + 1),
+            # "L_BVTs": np.sum(self.bvts[0]) / (self.services_accepted + 1),
+            # "S_BVTs": np.sum(self.bvts[2]) / (self.services_accepted + 1),
             "total_path_length": self.total_path_length_episode/( self.physical_services_accepted_episode + 1),
             "num_moves": self.counted_moves,
             "num_defrag_cycle": self.counted_defrag_cycles,
@@ -335,13 +368,10 @@ class PhyRMSAEnv(OpticalNetworkEnv):
 
         self._new_service = False
         self._next_service()
-        if self.episode_services_processed == 9000:
+        if self.episode_services_processed == 4800:
             a = 1
-
         # Periodical defragmentation
-
         if self.defrag_period:
-
             if self.services_processed % self.defrag_period == 0:
                 defrag_candidates = []
                 a = 1  ### there is no need to define a new channel class. go over running service, create the most good defragmentation options, then try to reallocate them.
@@ -352,7 +382,7 @@ class PhyRMSAEnv(OpticalNetworkEnv):
                             self.topology[service.path.node_list[i]][service.path.node_list[i + 1]]["index"])
                     for channel in service.channels:
                         if self.metric == 'cut':
-                            cut_diff = self.calculate_r_cut(channel, links_indexes, True)
+                            cut_diff = self.calculate_r_cut(channel, links_indexes, True, service.path, True)
                             if cut_diff > 0:
                                 defrag_candidates.append((cut_diff,
                                                           self.current_time - service.arrival_time, channel,
@@ -382,11 +412,11 @@ class PhyRMSAEnv(OpticalNetworkEnv):
                                         self.current_service.source, self.current_service.destination
                                     ]
                             ):
-                                if serached_path == path:
+                                if serached_path == candidate[4].path:
                                     break
                             if self.modulation_level[table_id][channel_number][idp] == self.modulation_level[table_id][candidate[2]][idp]:
                                 if self.metric == 'cut':
-                                    fragmentation_metric = self.calculate_r_cut(channel_number, candidate[3])
+                                    fragmentation_metric = self.calculate_r_cut(channel_number, candidate[3], False, candidate[4].path, True )
                                 else:
                                     fragmentation_metric = self.calculate_r_spatial(channel_number, candidate[3])
                                 reallocation_options.append((fragmentation_metric, channel_number))
@@ -509,9 +539,9 @@ class PhyRMSAEnv(OpticalNetworkEnv):
             dtype=int,
         )
 
-        if self.bit_rate_selection == "discrete":
-            self.bit_rate_requested_histogram = defaultdict(int)
-            self.bit_rate_provisioned_histogram = defaultdict(int)
+        # if self.bit_rate_selection == "discrete":
+        #     self.bit_rate_requested_histogram = defaultdict(int)
+        #     self.bit_rate_provisioned_histogram = defaultdict(int)
 
         self.topology.graph["compactness"] = 0.0
         self.topology.graph["throughput"] = 0.0
@@ -556,22 +586,18 @@ class PhyRMSAEnv(OpticalNetworkEnv):
         ):
             if serached_path == path:
                 break
-
+        path.idp = idp
 
         for i in range(len(path.node_list) - 1):
             for channel in channels:
                 self.topology.graph["available_channels"][
                     self.topology[path.node_list[i]][path.node_list[i + 1]]["index"],
-                    channel,
+                    channel[0],
                 ] = 0
                 self.spectrum_channels_allocation[
                     self.topology[path.node_list[i]][path.node_list[i + 1]]["index"],
-                    channel,
+                    channel[0],
                 ] = self.current_service.service_id
-
-
-
-
 
             self.topology[path.node_list[i]][path.node_list[i + 1]]["services"].append(
                 self.current_service
@@ -580,43 +606,82 @@ class PhyRMSAEnv(OpticalNetworkEnv):
                 "running_services"
             ].append(self.current_service)
             # self._update_link_stats(path.node_list[i], path.node_list[i + 1])
-
-
         tmp_modulation_level_total = 0 ## this variable is created to see how much left for the final transponder.
         # there are smarter ways to handle it, but i did not want to change the whole code.
+        # for i, channel in enumerate(channels):
+        #     mod_level = self.modulation_level[table_id][channel][idp]
+        #     gsnr = self.gsnr[table_id][channel][idp]
+        #     self.total_gsnr_episode += gsnr
+        #     self.total_modulation_level_episode += mod_level
+        #     self.channels_accepted_episode += 1
+        #     if i != len(channels) - 1 or (len(channels)==1 and self.current_service.bit_rate == mod_level):
+        #         tmp_modulation_level_total +=mod_level
+        #         channels_detail.append((channel, mod_level, 0, mod_level))
+        #         if channel <= self.num_spectrum_channels:
+        #             self.bvts[1][self.current_service.source_id][self.current_service.destination_id] += 1
+        #             # self.c_bvt[self.current_service.source_id][self.current_service.destination_id].append(Transponder(mod_level*100, 0, False))
+        #         elif self.num_spectrum_channels < channel <= 2 * self.num_spectrum_channels:
+        #             self.bvts[0][self.current_service.source_id][self.current_service.destination_id] += 1
+        #             # self.l_bvt[self.current_service.source_id][self.current_service.destination_id].append(Transponder(mod_level * 100, 0, False))
+        #         elif 2 * self.num_spectrum_channels < channel < 2 * self.num_spectrum_channels + self.number_spectrum_channels_s_band:
+        #             self.bvts[2][self.current_service.source_id][self.current_service.destination_id] += 1
+        #             # self.s_bvt[self.current_service.source_id][self.current_service.destination_id].append(Transponder(mod_level * 100, 0, False))
+        #
+        #     else:
+        #         remained_data = self.current_service.bit_rate - 100*tmp_modulation_level_total
+        #         self.channel_state[self.current_service.source_id, self.current_service.destination_id, idp].append((channel, remained_data/100,  mod_level - (remained_data/100), mod_level))
+        #         channels_detail.append((channel, remained_data/100, mod_level - (remained_data/100), mod_level))
+        #         if channel <= self.num_spectrum_channels:
+        #             self.bvts[1][self.current_service.source_id][self.current_service.destination_id] += 1
+        #             # self.c_bvt[self.current_service.source_id][self.current_service.destination_id].append(Transponder(mod_level*100, mod_level*100- remained_data, False))
+        #         elif self.num_spectrum_channels < channel <= 2 * self.num_spectrum_channels:
+        #             self.bvts[0][self.current_service.source_id][self.current_service.destination_id] += 1
+        #             # self.l_bvt[self.current_service.source_id][self.current_service.destination_id].append(Transponder(mod_level * 100, mod_level*100- remained_data, False))
+        #         elif 2 * self.num_spectrum_channels < channel < 2 * self.num_spectrum_channels + self.number_spectrum_channels_s_band:
+        #             self.bvts[2][self.current_service.source_id][self.current_service.destination_id] += 1
+        #             # self.s_bvt[self.current_service.source_id][self.current_service.destination_id].append(Transponder(mod_level * 100, mod_level*100- remained_data, False))
+
 
         for i, channel in enumerate(channels):
-            mod_level = self.modulation_level[table_id][channel][idp]
-            gsnr = self.gsnr[table_id][channel][idp]
+            mod_level = channel[3]
+            gsnr = self.gsnr[table_id][channel[0]][idp]
             self.total_gsnr_episode += gsnr
             self.total_modulation_level_episode += mod_level
             self.channels_accepted_episode += 1
-            if i != len(channels) - 1:
-                tmp_modulation_level_total +=mod_level
-                if channel <= self.num_spectrum_channels:
-                    self.bvts[1][self.current_service.source_id][self.current_service.destination_id] += 1
-                    # self.c_bvt[self.current_service.source_id][self.current_service.destination_id].append(Transponder(mod_level*100, 0, False))
-                elif self.num_spectrum_channels < channel <= 2 * self.num_spectrum_channels:
-                    self.bvts[0][self.current_service.source_id][self.current_service.destination_id] += 1
-                    # self.l_bvt[self.current_service.source_id][self.current_service.destination_id].append(Transponder(mod_level * 100, 0, False))
-                elif 2 * self.num_spectrum_channels < channel < 2 * self.num_spectrum_channels + self.number_spectrum_channels_s_band:
-                    self.bvts[2][self.current_service.source_id][self.current_service.destination_id] += 1
-                    # self.s_bvt[self.current_service.source_id][self.current_service.destination_id].append(Transponder(mod_level * 100, 0, False))
+            if channel[2] != 0:
+                self.channel_state[self.current_service.source_id, self.current_service.destination_id, idp].append(
+                    channel)
+            if channel[0] <= self.num_spectrum_channels:
+                self.bvts[1][self.current_service.source_id][self.current_service.destination_id] += 1
+            elif self.num_spectrum_channels < channel[0] <= 2 * self.num_spectrum_channels:
+                self.bvts[0][self.current_service.source_id][self.current_service.destination_id] += 1
+            elif 2 * self.num_spectrum_channels < channel[0] < 2 * self.num_spectrum_channels + self.number_spectrum_channels_s_band:
+                self.bvts[2][self.current_service.source_id][self.current_service.destination_id] += 1
+
+
+        self.topology.graph["running_services"].append(self.current_service)
+        self.current_service.path = path
+        self.current_service.channels = channels
+        # self._update_network_stats()
+
+    def _provision_virtual_path(self, path: Path, channels: list):
+        for idp, serached_path in enumerate(
+                self.k_shortest_paths[
+                    self.current_service.source, self.current_service.destination
+                ]
+        ):
+            if serached_path == path:
+                break
+        path.idp = idp
+
+        for i, channel in enumerate(channels):
+            target_channel = [t for t in self.channel_state[self.current_service.source_id, self.current_service.destination_id, idp] if t[0] == channel[0]][0]
+            if target_channel[2] >= channel[1]: # It means there is enough free resource on the channel.
+                self.channel_state[self.current_service.source_id, self.current_service.destination_id, idp].remove(target_channel)
+                updated_channel = (target_channel[0], target_channel[1] + channel[1], target_channel[2] - channel[1], target_channel[3])
+                self.channel_state[self.current_service.source_id, self.current_service.destination_id, idp].append(updated_channel)
             else:
-                # remained_data = self.current_service.bit_rate - 100*tmp_modulation_level_total
-                if channel <= self.num_spectrum_channels:
-                    self.bvts[1][self.current_service.source_id][self.current_service.destination_id] += 1
-                    # self.c_bvt[self.current_service.source_id][self.current_service.destination_id].append(Transponder(mod_level*100, mod_level*100- remained_data, False))
-                elif self.num_spectrum_channels < channel <= 2 * self.num_spectrum_channels:
-                    self.bvts[0][self.current_service.source_id][self.current_service.destination_id] += 1
-                    # self.l_bvt[self.current_service.source_id][self.current_service.destination_id].append(Transponder(mod_level * 100, mod_level*100- remained_data, False))
-                elif 2 * self.num_spectrum_channels < channel < 2 * self.num_spectrum_channels + self.number_spectrum_channels_s_band:
-                    self.bvts[2][self.current_service.source_id][self.current_service.destination_id] += 1
-                    # self.s_bvt[self.current_service.source_id][self.current_service.destination_id].append(Transponder(mod_level * 100, mod_level*100- remained_data, False))
-
-
-
-
+                raise ValueError(f"Expected first element to be 1, but got error ")
 
         self.topology.graph["running_services"].append(self.current_service)
         self.current_service.path = path
@@ -666,60 +731,86 @@ class PhyRMSAEnv(OpticalNetworkEnv):
         self.services_accepted += 1
         self.episode_services_accepted += 1
 
-        for idp, serached_path in enumerate(
-                self.k_shortest_paths[
-                    self.current_service.source, self.current_service.destination
-                ]
-        ):
-            if serached_path == self.current_service.path:
-                break
-
         if not virtual:
             self.total_path_length_episode += self.current_service.path.length
-            self.total_path_index_episode += idp+1
+            self.total_path_index_episode += self.current_service.path.idp+1
             self.physical_services_accepted_episode += 1
         self.bit_rate_provisioned += self.current_service.bit_rate
         self.episode_bit_rate_provisioned += self.current_service.bit_rate
 
-        if (
-                self.bit_rate_selection == "discrete"
-        ):  # if bit rate selection is discrete, populate the histograms
-            self.bit_rate_provisioned_histogram[self.current_service.bit_rate] += 1
-            self.episode_bit_rate_provisioned_histogram[
-                self.current_service.bit_rate
-            ] += 1
+        # if (
+        #         self.bit_rate_selection == "discrete"
+        # ):  # if bit rate selection is discrete, populate the histograms
+        #     self.bit_rate_provisioned_histogram[self.current_service.bit_rate] += 1
+        #     self.episode_bit_rate_provisioned_histogram[
+        #         self.current_service.bit_rate
+        #     ] += 1
 
     def _release_path(self, service: Service):
         for i in range(len(service.path.node_list) - 1):
             for channel in service.channels:
-                self.topology.graph["available_channels"][
-                    self.topology[service.path.node_list[i]][service.path.node_list[i + 1]][
-                        "index"
-                    ],
-                    channel,
-                ] = 1
-                self.spectrum_channels_allocation[
-                    self.topology[service.path.node_list[i]][service.path.node_list[i + 1]][
-                        "index"
-                    ],
-                    channel,
-                ] = -1
+                if channel[1] == channel[3]:
+                    self.topology.graph["available_channels"][
+                        self.topology[service.path.node_list[i]][service.path.node_list[i + 1]][
+                            "index"
+                        ],
+                        channel[0],
+                    ] = 1
+                    self.spectrum_channels_allocation[
+                        self.topology[service.path.node_list[i]][service.path.node_list[i + 1]][
+                            "index"
+                        ],
+                        channel[0],
+                    ] = -1
             self.topology[service.path.node_list[i]][service.path.node_list[i + 1]][
-                "running_services"
-            ].remove(service)
+                        "running_services"
+                    ].remove(service)
+
+        for channel in service.channels:
+            if channel[1] != channel[3]:
+                result = next((tup for tup in self.channel_state[service.source_id,
+                                                                 service.destination_id,
+                                                                 service.path.idp] if tup[0] == channel[0]), None)
+                # if result [0] ==8:
+                #     a = 2
+                # if result not in self.channel_state[service.source_id,
+                #                                                  service.destination_id,
+                #                                                  service.path.idp]:
+                #     a=1
+                self.channel_state[
+                    service.source_id, service.destination_id, service.path.idp].remove(result)
+                if result == channel:
+                    self.topology.graph["available_channels"][
+                        self.topology[service.path.node_list[i]][service.path.node_list[i + 1]][
+                            "index"
+                        ],
+                        channel[0],
+                    ] = 1
+                    self.spectrum_channels_allocation[
+                        self.topology[service.path.node_list[i]][service.path.node_list[i + 1]][
+                            "index"
+                        ],
+                        channel[0],
+                    ] = -1
+
+                else:
+                    self.channel_state[
+                        service.source_id, service.destination_id, service.path.idp].append(
+                        (result[0], result[1] - channel[1], result[2] + channel[1], result[3]))
+
             # self._update_link_stats(
             #     service.path.node_list[i], service.path.node_list[i + 1]
             # )
 
         self.topology.graph["running_services"].remove(service)
 
-        for channel in service.channels:
-            if channel <= self.num_spectrum_channels:
-                self.bvts[1][self.current_service.source_id][self.current_service.destination_id] -= 1
-            elif self.num_spectrum_channels < channel <= 2 * self.num_spectrum_channels:
-                self.bvts[0][self.current_service.source_id][self.current_service.destination_id] -= 1
-            elif 2 * self.num_spectrum_channels < channel < 2 * self.num_spectrum_channels + self.number_spectrum_channels_s_band:
-                self.bvts[2][self.current_service.source_id][self.current_service.destination_id] = 1
+        # for channel in service.channels:
+        #     if channel <= self.num_spectrum_channels:
+        #         self.bvts[1][self.current_service.source_id][self.current_service.destination_id] -= 1
+        #     elif self.num_spectrum_channels < channel <= 2 * self.num_spectrum_channels:
+        #         self.bvts[0][self.current_service.source_id][self.current_service.destination_id] -= 1
+        #     elif 2 * self.num_spectrum_channels < channel < 2 * self.num_spectrum_channels + self.number_spectrum_channels_s_band:
+        #         self.bvts[2][self.current_service.source_id][self.current_service.destination_id] = 1
 
     def _update_network_stats(self):
         last_update = self.topology.graph["last_update"]
@@ -883,7 +974,7 @@ class PhyRMSAEnv(OpticalNetworkEnv):
             for i in range(len(path.node_list) - 1):
                 if self.topology.graph["available_channels"][
                     self.topology[path.node_list[i]][path.node_list[i + 1]]["index"],
-                    channel_number] == 0:
+                    channel_number[0]] == 0:
                     free_flag = False
         return free_flag
 
@@ -1111,54 +1202,51 @@ class PhyRMSAEnv(OpticalNetworkEnv):
         return cur_spectrum_compactness
 
 
-def phy_aware_sapff_rmsa(env: PhyRMSAEnv) -> Tuple[int, list]:
-    # first to check if we have enough resource in virtual layer
-    # TODO: this is not the best way to handle the grroming layer. For example, if grooming layer has 300 Gbps, and service is 500 Gbps, then 300 can be used!
-    if env.grooming_layer[env.current_service.source_id][
-        env.current_service.destination_id] >= env.current_service.bit_rate:
-        env.grooming_layer[env.current_service.source_id][
-            env.current_service.destination_id] -= env.current_service.bit_rate
-        return (-1, [])  # No need to establish a new service, and -1 means service is established over IP layer
-    else:
-        unassigned_bitrate = env.current_service.bit_rate
-        selected_channels = []
-        table_id = np.where(((env.connections_detail[:, 0] == int(env.current_service.source)) & (
-                    env.connections_detail[:, 1] == int(env.current_service.destination))) | (
-                                    (env.connections_detail[:, 0] == int(env.current_service.destination)) & (
-                                        env.connections_detail[:, 1] == int(env.current_service.source))))[0][0]
-
-        ## this could be the Shortest available path first fit solution.
-        for idp, path in enumerate(
-                env.k_shortest_paths[
-                    env.current_service.source, env.current_service.destination
-                ]
-        ):
-            for channel_number in range(
-                    0, env.topology.graph["num_channel_resources"]
-            ):
-                if env.is_channel_free(path, channel_number):
-                    mod_level = env.modulation_level[table_id][channel_number][idp]
-                    selected_channels.append(channel_number)
-                    unassigned_bitrate -= mod_level * 100
-                    if unassigned_bitrate <= 0:
-                        env.grooming_layer[env.current_service.source_id][
-                            env.current_service.destination_id] -= unassigned_bitrate
-                        return (idp, selected_channels)
-
-            selected_channels = []
-            unassigned_bitrate = env.current_service.bit_rate
-
-        return (-2, [])  # -2 means service is blocked
+# def phy_aware_sapff_rmsa(env: PhyRMSAEnv) -> Tuple[int, list]:
+#     # first to check if we have enough resource in virtual layer
+#     # TODO: this is not the best way to handle the grroming layer. For example, if grooming layer has 300 Gbps, and service is 500 Gbps, then 300 can be used!
+#     if env.grooming_layer[env.current_service.source_id][
+#         env.current_service.destination_id] >= env.current_service.bit_rate:
+#         env.grooming_layer[env.current_service.source_id][
+#             env.current_service.destination_id] -= env.current_service.bit_rate
+#         return (-1, [])  # No need to establish a new service, and -1 means service is established over IP layer
+#     else:
+#         unassigned_bitrate = env.current_service.bit_rate
+#         selected_channels = []
+#         table_id = np.where(((env.connections_detail[:, 0] == int(env.current_service.source)) & (
+#                     env.connections_detail[:, 1] == int(env.current_service.destination))) | (
+#                                     (env.connections_detail[:, 0] == int(env.current_service.destination)) & (
+#                                         env.connections_detail[:, 1] == int(env.current_service.source))))[0][0]
+#
+#         ## this could be the Shortest available path first fit solution.
+#         for idp, path in enumerate(
+#                 env.k_shortest_paths[
+#                     env.current_service.source, env.current_service.destination
+#                 ]
+#         ):
+#             for channel_number in range(
+#                     0, env.topology.graph["num_channel_resources"]
+#             ):
+#                 if env.is_channel_free(path, channel_number):
+#                     mod_level = env.modulation_level[table_id][channel_number][idp]
+#                     selected_channels.append(channel_number)
+#                     unassigned_bitrate -= mod_level * 100
+#                     if unassigned_bitrate <= 0:
+#                         env.grooming_layer[env.current_service.source_id][
+#                             env.current_service.destination_id] -= unassigned_bitrate
+#                         return (idp, selected_channels)
+#
+#             selected_channels = []
+#             unassigned_bitrate = env.current_service.bit_rate
+#
+#         return (-2, [])  # -2 means service is blocked
 
 
 def phy_aware_sapbm_rmsa(env: PhyRMSAEnv) -> Tuple[int, list]:
     # first to check if we have enough resource in virtual layer
-    # TODO: this is not the best way to handle the grroming layer. For example, if grooming layer has 300 Gbps, and service is 500 Gbps, then 300 can be used!
-    if env.grooming_layer[env.current_service.source_id][
-        env.current_service.destination_id] >= env.current_service.bit_rate:
-        env.grooming_layer[env.current_service.source_id][
-            env.current_service.destination_id] -= env.current_service.bit_rate
-        return (-1, [])  # No need to establish a new service, and -1 means service is established over IP layer
+    result = use_existing_channels(env)
+    if result[0] != -3:
+        return (result[0] + 20, result[1])
     else:
         unassigned_bitrate = env.current_service.bit_rate
         selected_channels = []
@@ -1182,26 +1270,8 @@ def phy_aware_sapbm_rmsa(env: PhyRMSAEnv) -> Tuple[int, list]:
                     mod_level = env.modulation_level[table_id][channel_number][idp]
                     free_channels[idp].append((mod_level, channel_number, idp))
 
-                    # free_channels.append((channel_number, idp, mod_level))
-                    # selected_channels.append(channel_number)
-                    # unassigned_bitrate -= mod_level*100
-                    # if unassigned_bitrate <= 0:
-                    #     env.grooming_layer[env.current_service.source_id][env.current_service.destination_id] -= unassigned_bitrate
-                    #     return (idp, selected_channels)
-
-            # selected_channels = []
-            # unassigned_bitrate = env.current_service.bit_rate
-
         sorted_free_channels = [sorted(row, key=lambda x: (-x[0], x[1])) for row in free_channels]
 
-        # while True:
-        #     best_channel = None
-        #     for i, (channel_index, path_id, mod_level) in enumerate(free_channels):
-        #         if best_channel is None or \
-        #                 (mod_level > best_channel[2] or
-        #                  (mod_level == best_channel[2] and path_id < best_channel[1] or
-        #                   (mod_level == best_channel[2] and path_id == best_channel[1] and channel_index < best_channel[0]))):
-        #             best_channel = (channel_index, path_id, mod_level)
         while True:
             max_modulation_level = float('-inf')
             max_modulation_row_index = None
@@ -1222,13 +1292,12 @@ def phy_aware_sapbm_rmsa(env: PhyRMSAEnv) -> Tuple[int, list]:
                 return (-2, [])
             else:
                 for channel in sorted_free_channels[max_modulation_row_index]:
-                    selected_channels.append(channel[1])
                     unassigned_bitrate -= channel[0] * 100
                     if unassigned_bitrate <= 0:
-                        env.grooming_layer[env.current_service.source_id][
-                            env.current_service.destination_id] -= unassigned_bitrate
+                        selected_channels.append((channel[1], channel[0] + unassigned_bitrate/100, unassigned_bitrate/-100, channel[0], False ))
                         return (channel[2], selected_channels)
-
+                    else:
+                        selected_channels.append((channel[1], channel[0], 0, channel[0], False))
                 if len(sorted_free_channels) > max_modulation_row_index:
                     sorted_free_channels.pop(max_modulation_row_index)
                 elif len(sorted_free_channels) == 0:
@@ -1239,15 +1308,11 @@ def phy_aware_sapbm_rmsa(env: PhyRMSAEnv) -> Tuple[int, list]:
 def phy_aware_bmff_rmsa(env: PhyRMSAEnv) -> Tuple[int, list]:
     # first to check if we have enough resource in virtual layer
     # TODO: this is not the best way to handle the grroming layer. For example, if grooming layer has 300 Gbps, and service is 500 Gbps, then 300 can be used!
-    if env.grooming_layer[env.current_service.source_id][
-        env.current_service.destination_id] >= env.current_service.bit_rate:
-        env.grooming_layer[env.current_service.source_id][
-            env.current_service.destination_id] -= env.current_service.bit_rate
-        return (-1, [])  # No need to establish a new service, and -1 means service is established over IP layer
+    # first to check if we have enough resource in virtual layer
+    result = use_existing_channels(env)
+    if result[0] != -3:
+        return (result[0] + 20, result[1])
     else:
-        unassigned_bitrate = env.current_service.bit_rate
-        selected_channels = []
-        # free_channels = []
         table_id = np.where(((env.connections_detail[:, 0] == int(env.current_service.source)) & (
                     env.connections_detail[:, 1] == int(env.current_service.destination))) | (
                                     (env.connections_detail[:, 0] == int(env.current_service.destination)) & (
@@ -1266,26 +1331,8 @@ def phy_aware_bmff_rmsa(env: PhyRMSAEnv) -> Tuple[int, list]:
                 if env.is_channel_free(path, channel_number):
                     mod_level = env.modulation_level[table_id][channel_number][idp]
                     free_channels[idp].append((mod_level, channel_number, idp))
-
-                    # free_channels.append((channel_number, idp, mod_level))
-                    # selected_channels.append(channel_number)
-                    # unassigned_bitrate -= mod_level*100
-                    # if unassigned_bitrate <= 0:
-                    #     env.grooming_layer[env.current_service.source_id][env.current_service.destination_id] -= unassigned_bitrate
-                    #     return (idp, selected_channels)
-
-            # selected_channels = []
-            # unassigned_bitrate = env.current_service.bit_rate
         sorted_free_channels = [sorted(row, key=lambda x: (-x[0], x[1])) for row in free_channels]
 
-        # while True:
-        #     best_channel = None
-        #     for i, (channel_index, path_id, mod_level) in enumerate(free_channels):
-        #         if best_channel is None or \
-        #                 (mod_level > best_channel[2] or
-        #                  (mod_level == best_channel[2] and path_id < best_channel[1] or
-        #                   (mod_level == best_channel[2] and path_id == best_channel[1] and channel_index < best_channel[0]))):
-        #             best_channel = (channel_index, path_id, mod_level)
         while True:
             max_modulation_level = float('-inf')
             max_modulation_row_index = None
@@ -1302,12 +1349,12 @@ def phy_aware_bmff_rmsa(env: PhyRMSAEnv) -> Tuple[int, list]:
                 return (-2, [])
             else:
                 for channel in sorted_free_channels[max_modulation_row_index]:
-                    selected_channels.append(channel[1])
                     unassigned_bitrate -= channel[0] * 100
                     if unassigned_bitrate <= 0:
-                        env.grooming_layer[env.current_service.source_id][
-                            env.current_service.destination_id] -= unassigned_bitrate
+                        selected_channels.append((channel[1], channel[0] + unassigned_bitrate/100, unassigned_bitrate/-100, channel[0], False ))
                         return (channel[2], selected_channels)
+                    else:
+                        selected_channels.append((channel[1], channel[0], 0, channel[0], False))
 
                 if len(sorted_free_channels) > max_modulation_row_index:
                     sorted_free_channels.pop(max_modulation_row_index)
@@ -1318,16 +1365,10 @@ def phy_aware_bmff_rmsa(env: PhyRMSAEnv) -> Tuple[int, list]:
 
 def phy_aware_bmfa_rmsa(env: PhyRMSAEnv) -> Tuple[int, list]:
     # first to check if we have enough resource in virtual layer
-    # TODO: this is not the best way to handle the grroming layer. For example, if grooming layer has 300 Gbps, and service is 500 Gbps, then 300 can be used!
-    if env.grooming_layer[env.current_service.source_id][
-        env.current_service.destination_id] >= env.current_service.bit_rate:
-        env.grooming_layer[env.current_service.source_id][
-            env.current_service.destination_id] -= env.current_service.bit_rate
-        return (-1, [])  # No need to establish a new service, and -1 means service is established over IP layer
+    result = use_existing_channels(env)
+    if result[0] != -3:
+        return (result[0] + 20, result[1])
     else:
-        unassigned_bitrate = env.current_service.bit_rate
-        selected_channels = []
-        # free_channels = []
         table_id = np.where(((env.connections_detail[:, 0] == int(env.current_service.source)) & (
                     env.connections_detail[:, 1] == int(env.current_service.destination))) | (
                                     (env.connections_detail[:, 0] == int(env.current_service.destination)) & (
@@ -1373,31 +1414,26 @@ def phy_aware_bmfa_rmsa(env: PhyRMSAEnv) -> Tuple[int, list]:
                 return (-2, [])
             else:
                 for channel in sorted_free_channels[max_modulation_row_index]:
-                    selected_channels.append(channel[2])
                     unassigned_bitrate -= channel[0] * 100
                     if unassigned_bitrate <= 0:
-                        env.grooming_layer[env.current_service.source_id][
-                            env.current_service.destination_id] -= unassigned_bitrate
+                        selected_channels.append((channel[2], channel[0] + unassigned_bitrate/100, unassigned_bitrate/-100, channel[0], False ))
                         return (channel[3], selected_channels)
+                    else:
+                        selected_channels.append((channel[2], channel[0], 0, channel[0], False))
 
                 if len(sorted_free_channels) > max_modulation_row_index:
                     sorted_free_channels.pop(max_modulation_row_index)
                 elif len(sorted_free_channels) == 0:
                     return (-2, [])
+        return (-2, [])
 
 
 def phy_aware_bmfa_rss_rmsa(env: PhyRMSAEnv) -> Tuple[int, list]:
     # first to check if we have enough resource in virtual layer
-    # TODO: this is not the best way to handle the grroming layer. For example, if grooming layer has 300 Gbps, and service is 500 Gbps, then 300 can be used!
-    if env.grooming_layer[env.current_service.source_id][
-        env.current_service.destination_id] >= env.current_service.bit_rate:
-        env.grooming_layer[env.current_service.source_id][
-            env.current_service.destination_id] -= env.current_service.bit_rate
-        return (-1, [])  # No need to establish a new service, and -1 means service is established over IP layer
+    result = use_existing_channels(env)
+    if result[0] != -3:
+        return (result[0] + 20, result[1])
     else:
-        unassigned_bitrate = env.current_service.bit_rate
-        selected_channels = []
-        # free_channels = []
         table_id = np.where(((env.connections_detail[:, 0] == int(env.current_service.source)) & (
                     env.connections_detail[:, 1] == int(env.current_service.destination))) | (
                                     (env.connections_detail[:, 0] == int(env.current_service.destination)) & (
@@ -1443,29 +1479,57 @@ def phy_aware_bmfa_rss_rmsa(env: PhyRMSAEnv) -> Tuple[int, list]:
                 return (-2, [])
             else:
                 for channel in sorted_free_channels[max_modulation_row_index]:
-                    selected_channels.append(channel[2])
                     unassigned_bitrate -= channel[0] * 100
                     if unassigned_bitrate <= 0:
-                        env.grooming_layer[env.current_service.source_id][
-                            env.current_service.destination_id] -= unassigned_bitrate
+                        selected_channels.append((channel[2], channel[0] + unassigned_bitrate / 100,
+                                                  unassigned_bitrate / -100, channel[0], False))
                         return (channel[3], selected_channels)
+                    else:
+                        selected_channels.append((channel[2], channel[0], 0, channel[0], False))
 
                 if len(sorted_free_channels) > max_modulation_row_index:
                     sorted_free_channels.pop(max_modulation_row_index)
                 elif len(sorted_free_channels) == 0:
                     return (-2, [])
+        return (-2, [])
 
 
-def shortest_available_path_first_fit(env: PhyRMSAEnv) -> Tuple[int, int]:
+# def shortest_available_path_first_fit(env: PhyRMSAEnv) -> Tuple[int, int]:
+#     for idp, path in enumerate(
+#             env.k_shortest_paths[
+#                 env.current_service.source, env.current_service.destination
+#             ]
+#     ):
+#         num_slots = env.get_number_slots(path)
+#         for initial_slot in range(
+#                 0, env.topology.graph["num_spectrum_resources"] - num_slots
+#         ):
+#             if env.is_path_free(path, initial_slot, num_slots):
+#                 return (idp, initial_slot)
+#     return (env.topology.graph["k_paths"], env.topology.graph["num_spectrum_resources"])
+
+
+def use_existing_channels(env:PhyRMSAEnv) -> Tuple:
+
+    unassigned_bitrate = env.current_service.bit_rate
+    selected_channels = []
+
     for idp, path in enumerate(
             env.k_shortest_paths[
                 env.current_service.source, env.current_service.destination
             ]
     ):
-        num_slots = env.get_number_slots(path)
-        for initial_slot in range(
-                0, env.topology.graph["num_spectrum_resources"] - num_slots
-        ):
-            if env.is_path_free(path, initial_slot, num_slots):
-                return (idp, initial_slot)
-    return (env.topology.graph["k_paths"], env.topology.graph["num_spectrum_resources"])
+        if sum(candidate_channel[2] for candidate_channel in env.channel_state[env.current_service.source_id, env.current_service.destination_id, idp]) >= unassigned_bitrate/100:
+            for candidate_channel in env.channel_state[env.current_service.source_id, env.current_service.destination_id, idp]:
+
+                #Here you ca work with selected_channels  and pass it to the other function, or finish everyhing here.
+                if candidate_channel[2] > 0:
+                    unassigned_bitrate -= candidate_channel[2] * 100
+                    if unassigned_bitrate <= 0:
+                        selected_channels.append((candidate_channel[0], candidate_channel[2] + unassigned_bitrate / 100,
+                                                  unassigned_bitrate / -100, candidate_channel[3], True))
+                        return (idp, selected_channels)
+                    else:
+                        selected_channels.append((candidate_channel[0], candidate_channel[2], 0, candidate_channel[3], True))
+
+    return (-3, [])

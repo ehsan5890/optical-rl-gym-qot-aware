@@ -30,6 +30,8 @@ class Path:
     node_list: Tuple[str]
     hops: int
     length: Union[int, float]
+    idp: Optional[int] = field(default=0)
+
     best_modulation: Optional[Modulation] = field(default=None)
     current_modulation: Optional[Modulation] = field(default=None)
 
