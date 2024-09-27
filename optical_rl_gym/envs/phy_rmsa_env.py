@@ -311,7 +311,7 @@ class PhyRMSAEnv(OpticalNetworkEnv):
                     )
                     self._service_acceptance(False)
 
-                self._add_release(self.current_service)
+            self._add_release(self.current_service)
         self.topology.graph["services"].append(self.current_service)
 
         # generating statistics for the episode info
@@ -780,18 +780,19 @@ class PhyRMSAEnv(OpticalNetworkEnv):
                 self.channel_state[
                     service.source_id, service.destination_id, service.path.idp].remove(result)
                 if result == channel:
-                    self.topology.graph["available_channels"][
-                        self.topology[service.path.node_list[i]][service.path.node_list[i + 1]][
-                            "index"
-                        ],
-                        channel[0],
-                    ] = 1
-                    self.spectrum_channels_allocation[
-                        self.topology[service.path.node_list[i]][service.path.node_list[i + 1]][
-                            "index"
-                        ],
-                        channel[0],
-                    ] = -1
+                    for i in range(len(service.path.node_list) - 1):
+                        self.topology.graph["available_channels"][
+                            self.topology[service.path.node_list[i]][service.path.node_list[i + 1]][
+                                "index"
+                            ],
+                            channel[0],
+                        ] = 1
+                        self.spectrum_channels_allocation[
+                            self.topology[service.path.node_list[i]][service.path.node_list[i + 1]][
+                                "index"
+                            ],
+                            channel[0],
+                        ] = -1
 
                 else:
                     self.channel_state[
