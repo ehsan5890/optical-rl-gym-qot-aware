@@ -368,7 +368,7 @@ class PhyRMSAEnv(OpticalNetworkEnv):
 
         self._new_service = False
         self._next_service()
-        if self.episode_services_processed == 4800:
+        if self.episode_services_processed == 12000:
             a = 1
         # Periodical defragmentation
         if self.defrag_period:
@@ -649,8 +649,8 @@ class PhyRMSAEnv(OpticalNetworkEnv):
             self.total_modulation_level_episode += mod_level
             self.channels_accepted_episode += 1
             if channel[2] != 0:
-                self.channel_state[self.current_service.source_id, self.current_service.destination_id, idp].append(
-                    channel)
+                self.channel_state[self.current_service.source_id, self.current_service.destination_id, idp].append((channel[0], channel[1], channel[2], channel[3])
+                    )
             if channel[0] <= self.num_spectrum_channels:
                 self.bvts[1][self.current_service.source_id][self.current_service.destination_id] += 1
             elif self.num_spectrum_channels < channel[0] <= 2 * self.num_spectrum_channels:
@@ -658,6 +658,15 @@ class PhyRMSAEnv(OpticalNetworkEnv):
             elif 2 * self.num_spectrum_channels < channel[0] < 2 * self.num_spectrum_channels + self.number_spectrum_channels_s_band:
                 self.bvts[2][self.current_service.source_id][self.current_service.destination_id] += 1
 
+
+        my_list = self.channel_state[self.current_service.source_id, self.current_service.destination_id, idp]
+        first_elements = set()
+
+        # Check for duplicate first elements
+        for tup in my_list:
+            if tup[0] in first_elements:
+                print(f"Found two tuples with the same first element: {tup[0]}")
+            first_elements.add(tup[0])
 
         self.topology.graph["running_services"].append(self.current_service)
         self.current_service.path = path
@@ -675,13 +684,25 @@ class PhyRMSAEnv(OpticalNetworkEnv):
         path.idp = idp
 
         for i, channel in enumerate(channels):
-            target_channel = [t for t in self.channel_state[self.current_service.source_id, self.current_service.destination_id, idp] if t[0] == channel[0]][0]
+            target_channel1 = [t for t in self.channel_state[self.current_service.source_id, self.current_service.destination_id, idp] if t[0] == channel[0]]
+            if len(target_channel1) >1:
+                a=2
+            target_channel = target_channel1[0]
             if target_channel[2] >= channel[1]: # It means there is enough free resource on the channel.
                 self.channel_state[self.current_service.source_id, self.current_service.destination_id, idp].remove(target_channel)
                 updated_channel = (target_channel[0], target_channel[1] + channel[1], target_channel[2] - channel[1], target_channel[3])
                 self.channel_state[self.current_service.source_id, self.current_service.destination_id, idp].append(updated_channel)
             else:
                 raise ValueError(f"Expected first element to be 1, but got error ")
+        my_list = self.channel_state[self.current_service.source_id, self.current_service.destination_id, idp]
+        first_elements = set()
+
+        # Check for duplicate first elements
+        for tup in my_list:
+            if tup[0] in first_elements:
+                print(f"Found two tuples with the same first element: {tup[0]}")
+            first_elements.add(tup[0])
+
 
         self.topology.graph["running_services"].append(self.current_service)
         self.current_service.path = path
@@ -762,15 +783,19 @@ class PhyRMSAEnv(OpticalNetworkEnv):
                         ],
                         channel[0],
                     ] = -1
-            self.topology[service.path.node_list[i]][service.path.node_list[i + 1]][
-                        "running_services"
-                    ].remove(service)
+            # self.topology[service.path.node_list[i]][service.path.node_list[i + 1]][
+            #             "running_services"
+            #         ].remove(service)
 
         for channel in service.channels:
             if channel[1] != channel[3]:
-                result = next((tup for tup in self.channel_state[service.source_id,
-                                                                 service.destination_id,
-                                                                 service.path.idp] if tup[0] == channel[0]), None)
+                # result = next((tup for tup in self.channel_state[service.source_id,
+                #                                                  service.destination_id,
+                #                                                  service.path.idp] if tup[0] == channel[0]), None)
+                result_temporarily =[t for t in self.channel_state[service.source_id, service.destination_id, service.path.idp] if t[0] == channel[0]]
+                if len(result_temporarily) > 1:
+                    a = 1
+                result = result_temporarily[0]
                 # if result [0] ==8:
                 #     a = 2
                 # if result not in self.channel_state[service.source_id,
@@ -779,7 +804,7 @@ class PhyRMSAEnv(OpticalNetworkEnv):
                 #     a=1
                 self.channel_state[
                     service.source_id, service.destination_id, service.path.idp].remove(result)
-                if result == channel:
+                if result[1] == channel[1]: ###if used ones are the same, so we are eligible to remove the channel
                     for i in range(len(service.path.node_list) - 1):
                         self.topology.graph["available_channels"][
                             self.topology[service.path.node_list[i]][service.path.node_list[i + 1]][
@@ -793,11 +818,30 @@ class PhyRMSAEnv(OpticalNetworkEnv):
                             ],
                             channel[0],
                         ] = -1
+                        # self.topology[service.path.node_list[i]][service.path.node_list[i + 1]][
+                        #     "running_services"
+                        # ].remove(service)
+
 
                 else:
                     self.channel_state[
                         service.source_id, service.destination_id, service.path.idp].append(
                         (result[0], result[1] - channel[1], result[2] + channel[1], result[3]))
+                    for a in self.channel_state[
+                        service.source_id, service.destination_id, service.path.idp]:
+                        if a[1] == 0:
+                            b =1
+
+
+        my_list = self.channel_state[
+                        service.source_id, service.destination_id, service.path.idp]
+        first_elements = set()
+
+        # Check for duplicate first elements
+        for tup in my_list:
+            if tup[0] in first_elements:
+                print(f"Found two tuples with the same first element: {tup[0]}")
+            first_elements.add(tup[0])
 
             # self._update_link_stats(
             #     service.path.node_list[i], service.path.node_list[i + 1]
@@ -963,8 +1007,8 @@ class PhyRMSAEnv(OpticalNetworkEnv):
         while len(self._events) > 0:
             (time, service_to_release) = heapq.heappop(self._events)
             if time <= self.current_time:
-                if not service_to_release.virtual_layer:
-                    self._release_path(service_to_release)
+                #if not service_to_release.virtual_layer:  # in the previous version, the services were not released, but here they should be releases
+                self._release_path(service_to_release)
             else:  # release is not to be processed yet
                 self._add_release(service_to_release)  # puts service back in the queue
                 break  # breaks the loop

@@ -53,7 +53,7 @@ modulation_jpn12 = jpn_data[0][0][1]
 gsnr_jpn12 = jpn_data[0][0][2]
 all_connections_jpn12 = jpn_data[0][0][0]
 
-min_load = 800
+min_load = 700
 max_load = 901
 step_length = 100
 steps = int((max_load - min_load) / step_length) + 1
