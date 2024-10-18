@@ -5,7 +5,8 @@ import pickle
 import gym
 import matplotlib.pyplot as plt
 import numpy as np
-from stable_baselines3.common.monitor import Monitor
+# from stable_baselines3.common.monitor import Monitor
+from gymnasium.wrappers import Monitor
 from scipy.io import loadmat
 from optical_rl_gym.envs.phy_rmsa_env import (
     phy_aware_bmff_rmsa,

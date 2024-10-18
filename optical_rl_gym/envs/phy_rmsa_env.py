@@ -1337,7 +1337,7 @@ def phy_aware_sapbm_rmsa(env: PhyRMSAEnv) -> Tuple[int, list]:
                 return (-2, [])
             else:
                 for channel in sorted_free_channels[max_modulation_row_index]:
-                    unassigned_bitrate -= channel[0] * 100
+                    unassigned_bitrate -= int(channel[0]) * 100
                     if unassigned_bitrate <= 0:
                         selected_channels.append((channel[1], channel[0] + unassigned_bitrate/100, unassigned_bitrate/-100, channel[0], False ))
                         return (channel[2], selected_channels)
@@ -1394,7 +1394,7 @@ def phy_aware_bmff_rmsa(env: PhyRMSAEnv) -> Tuple[int, list]:
                 return (-2, [])
             else:
                 for channel in sorted_free_channels[max_modulation_row_index]:
-                    unassigned_bitrate -= channel[0] * 100
+                    unassigned_bitrate -= int(channel[0]) * 100
                     if unassigned_bitrate <= 0:
                         selected_channels.append((channel[1], channel[0] + unassigned_bitrate/100, unassigned_bitrate/-100, channel[0], False ))
                         return (channel[2], selected_channels)
@@ -1459,7 +1459,7 @@ def phy_aware_bmfa_rmsa(env: PhyRMSAEnv) -> Tuple[int, list]:
                 return (-2, [])
             else:
                 for channel in sorted_free_channels[max_modulation_row_index]:
-                    unassigned_bitrate -= channel[0] * 100
+                    unassigned_bitrate -= int(channel[0]) * 100
                     if unassigned_bitrate <= 0:
                         selected_channels.append((channel[2], channel[0] + unassigned_bitrate/100, unassigned_bitrate/-100, channel[0], False ))
                         return (channel[3], selected_channels)
@@ -1524,7 +1524,7 @@ def phy_aware_bmfa_rss_rmsa(env: PhyRMSAEnv) -> Tuple[int, list]:
                 return (-2, [])
             else:
                 for channel in sorted_free_channels[max_modulation_row_index]:
-                    unassigned_bitrate -= channel[0] * 100
+                    unassigned_bitrate -= int(channel[0]) * 100
                     if unassigned_bitrate <= 0:
                         selected_channels.append((channel[2], channel[0] + unassigned_bitrate / 100,
                                                   unassigned_bitrate / -100, channel[0], False))
