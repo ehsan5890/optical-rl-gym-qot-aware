@@ -8,8 +8,6 @@ import numpy as np
 from stable_baselines3.common.monitor import Monitor
 from scipy.io import loadmat
 from optical_rl_gym.envs.phy_rmsa_env import (
-    shortest_available_path_first_fit,
-    phy_aware_sapff_rmsa,
     phy_aware_bmff_rmsa,
     phy_aware_bmfa_rmsa,
     phy_aware_bmfa_rss_rmsa,
@@ -22,8 +20,8 @@ from optical_rl_gym.utils import evaluate_heuristic, random_policy
 # logging.getLogger("rmsaenv").setLevel(logging.INFO)
 
 seed = 20
-episodes = 100
-episode_length = 100
+episodes = 1
+episode_length = 10000
 
 monitor_files = []
 policies = []
@@ -81,49 +79,49 @@ for load_counter, load in enumerate(range(min_load,max_load,step_length)):
     os.makedirs(log_dir, exist_ok=True)
 
 
-    env_phy_df = gym.make("PhyRMSA-v0", **env_args)
-    env_phy_df = Monitor(env_phy_df, log_dir + 'SAP-FF', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
-                                                                                             'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
-                                                                                             'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length'))
-
-    mean_reward_sp, std_reward_sp = evaluate_heuristic(
-        env_phy_df, phy_aware_sapff_rmsa, n_eval_episodes=episodes
-    )
-    print("SAP-FF:".ljust(8), f"{mean_reward_sp:.4f}  {std_reward_sp:<7.4f}")
-    print(
-        "\tBit rate blocking:",
-        (env_phy_df.episode_bit_rate_requested - env_phy_df.episode_bit_rate_provisioned)
-        / env_phy_df.episode_bit_rate_requested,
-    )
-    print(
-        "\tRequest blocking:",
-        (env_phy_df.episode_services_processed - env_phy_df.episode_services_accepted)
-        / env_phy_df.episode_services_processed,
-    )
-
-    # env_phy_bmff_df = gym.make("PhyRMSA-v0", **env_args)
-    # env_phy_bmff_df = Monitor(env_phy_bmff_df, log_dir + 'BM-SA-FF', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
+    # env_phy_df = gym.make("PhyRMSA-v0", **env_args)
+    # env_phy_df = Monitor(env_phy_df, log_dir + 'SAP-FF', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
     #                                                                                          'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
-    #                                                                                          'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length'))
+    #                                                                                           'total_path_length'))
+    #
     # mean_reward_sp, std_reward_sp = evaluate_heuristic(
-    #     env_phy_bmff_df, phy_aware_bmff_rmsa, n_eval_episodes=episodes
+    #     env_phy_df, phy_aware_sapff_rmsa, n_eval_episodes=episodes
     # )
-    # print("BM-FF:".ljust(8), f"{mean_reward_sp:.4f}  {std_reward_sp:<7.4f}")
+    # print("SAP-FF:".ljust(8), f"{mean_reward_sp:.4f}  {std_reward_sp:<7.4f}")
     # print(
     #     "\tBit rate blocking:",
-    #     (env_phy_bmff_df.episode_bit_rate_requested - env_phy_bmff_df.episode_bit_rate_provisioned)
-    #     / env_phy_bmff_df.episode_bit_rate_requested,
+    #     (env_phy_df.episode_bit_rate_requested - env_phy_df.episode_bit_rate_provisioned)
+    #     / env_phy_df.episode_bit_rate_requested,
     # )
     # print(
     #     "\tRequest blocking:",
-    #     (env_phy_bmff_df.episode_services_processed - env_phy_bmff_df.episode_services_accepted)
-    #     / env_phy_bmff_df.episode_services_processed,
+    #     (env_phy_df.episode_services_processed - env_phy_df.episode_services_accepted)
+    #     / env_phy_df.episode_services_processed,
     # )
+
+    env_phy_bmff_df = gym.make("PhyRMSA-v0", **env_args)
+    env_phy_bmff_df = Monitor(env_phy_bmff_df, log_dir + 'BM-SA-FF', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
+                                                                                             'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
+                                                                                             'total_path_length'))
+    mean_reward_sp, std_reward_sp = evaluate_heuristic(
+        env_phy_bmff_df, phy_aware_bmff_rmsa, n_eval_episodes=episodes
+    )
+    print("BM-FF:".ljust(8), f"{mean_reward_sp:.4f}  {std_reward_sp:<7.4f}")
+    print(
+        "\tBit rate blocking:",
+        (env_phy_bmff_df.episode_bit_rate_requested - env_phy_bmff_df.episode_bit_rate_provisioned)
+        / env_phy_bmff_df.episode_bit_rate_requested,
+    )
+    print(
+        "\tRequest blocking:",
+        (env_phy_bmff_df.episode_services_processed - env_phy_bmff_df.episode_services_accepted)
+        / env_phy_bmff_df.episode_services_processed,
+    )
 
     env_phy_bmfa_cut_df = gym.make("PhyRMSA-v0", **env_args)
     env_phy_bmfa_cut_df = Monitor(env_phy_bmfa_cut_df, log_dir + 'BM-FA-Cut', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
                                                                                              'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
-                                                                                             'C_BVTs', 'L_BVTs', 'S_BVTs', 'total_path_length', 'avrage_gsnr', 'average_mod_level'))
+                                                                                              'total_path_length', 'avrage_gsnr', 'average_mod_level'))
     mean_reward_sp, std_reward_sp = evaluate_heuristic(
         env_phy_bmfa_cut_df, phy_aware_bmfa_rmsa, n_eval_episodes=episodes
     )

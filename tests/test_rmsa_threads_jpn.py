@@ -5,8 +5,7 @@ import pickle
 import gym
 import matplotlib.pyplot as plt
 import numpy as np
-# from stable_baselines3.common.monitor import Monitor
-from gymnasium.wrappers import Monitor
+from stable_baselines3.common.monitor import Monitor
 from scipy.io import loadmat
 from optical_rl_gym.envs.phy_rmsa_env import (
     phy_aware_bmff_rmsa,
@@ -54,8 +53,8 @@ modulation_jpn12 = jpn_data[0][0][1]
 gsnr_jpn12 = jpn_data[0][0][2]
 all_connections_jpn12 = jpn_data[0][0][0]
 
-min_load = 700
-max_load = 901
+min_load = 900
+max_load = 1501
 step_length = 100
 steps = int((max_load - min_load) / step_length) + 1
 

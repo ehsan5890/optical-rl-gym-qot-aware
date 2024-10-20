@@ -105,6 +105,7 @@ class PhyRMSAEnv(OpticalNetworkEnv):
         self.services_accepted_virtual = 0
         self.physical_services_accepted_episode = 0
         self.counted_moves = 0
+        self.counted_moves_groom = 0
         self.counted_defrag_cycles = 0
         # setting up bit rate selection
         self.bit_rate_selection = bit_rate_selection
@@ -358,6 +359,7 @@ class PhyRMSAEnv(OpticalNetworkEnv):
             # "S_BVTs": np.sum(self.bvts[2]) / (self.services_accepted + 1),
             "total_path_length": self.total_path_length_episode/( self.physical_services_accepted_episode + 1),
             "num_moves": self.counted_moves,
+            "num_moves_groom": self.counted_moves_groom,
             "num_defrag_cycle": self.counted_defrag_cycles,
             "avrage_gsnr": self.total_gsnr_episode/(self.channels_accepted_episode + 1),
             "average_mod_level": self.total_modulation_level_episode/(self.channels_accepted_episode+1),
@@ -373,64 +375,67 @@ class PhyRMSAEnv(OpticalNetworkEnv):
         # Periodical defragmentation
         if self.defrag_period:
             if self.services_processed % self.defrag_period == 0:
-                defrag_candidates = []
-                a = 1  ### there is no need to define a new channel class. go over running service, create the most good defragmentation options, then try to reallocate them.
-                for service in self.topology.graph["running_services"]:
-                    links_indexes = []
-                    for i in range(len(service.path.node_list) - 1):
-                        links_indexes.append(
-                            self.topology[service.path.node_list[i]][service.path.node_list[i + 1]]["index"])
-                    for channel in service.channels:
-                        if self.metric == 'cut':
-                            cut_diff = self.calculate_r_cut(channel, links_indexes, True, service.path, True)
-                            if cut_diff > 0:
-                                defrag_candidates.append((cut_diff,
-                                                          self.current_time - service.arrival_time, channel,
-                                                          links_indexes, service))
-                        else:
-                            rss_diff = self.calculate_r_spatial(channel, links_indexes, True)
-                            if rss_diff > 0:
-                                defrag_candidates.append((rss_diff,
-                                                          self.current_time - service.arrival_time, channel,
-                                                          links_indexes, service))
-                sorted_defrag_candidates = sorted(defrag_candidates, key=lambda x: (-x[0], -x[1]))
-                num_moves = 0
-                for i, candidate in enumerate(sorted_defrag_candidates):
-                    reallocation_options = []
-                    for channel_number in range(
-                            0, self.topology.graph["num_channel_resources"]
-                    ):
-                        if self.is_channel_free(candidate[4].path, channel_number):
-                            table_id = np.where(((self.connections_detail[:, 0] == int(candidate[4].source)) & (
-                                    self.connections_detail[:, 1] == int(candidate[4].destination))) | (
-                                                        (self.connections_detail[:, 0] == int(
-                                                            candidate[4].destination)) & (
-                                                                self.connections_detail[:, 1] == int(
-                                                            candidate[4].source))))[0][0]
-                            for idp, serached_path in enumerate(
-                                    self.k_shortest_paths[
-                                        self.current_service.source, self.current_service.destination
-                                    ]
-                            ):
-                                if serached_path == candidate[4].path:
-                                    break
-                            if self.modulation_level[table_id][channel_number][idp] == self.modulation_level[table_id][candidate[2]][idp]:
+                self.counted_moves_groom = self.groom_defragmentation()
+                if self.counted_moves_groom >=self.number_moves:
+                    defrag_candidates = []
+                    ### there is no need to define a new channel class. go over running service, create the most good defragmentation options, then try to reallocate them.
+                    for service in self.topology.graph["running_services"]:
+                        links_indexes = []
+                        for i in range(len(service.path.node_list) - 1):
+                            links_indexes.append(
+                                self.topology[service.path.node_list[i]][service.path.node_list[i + 1]]["index"])
+                        for channel in service.channels:
+                            if channel[1] == channel[3]: ## we only reallocate full channels, the other ones propably i not appropriate to be reallocated
                                 if self.metric == 'cut':
-                                    fragmentation_metric = self.calculate_r_cut(channel_number, candidate[3], False, candidate[4].path, True )
+                                    cut_diff = self.calculate_r_cut(channel, links_indexes, True, service.path, True)
+                                    if cut_diff > 0:
+                                        defrag_candidates.append((cut_diff,
+                                                                  self.current_time - service.arrival_time, channel,
+                                                                  links_indexes, service))
                                 else:
-                                    fragmentation_metric = self.calculate_r_spatial(channel_number, candidate[3])
-                                reallocation_options.append((fragmentation_metric, channel_number))
-                    reallocation_options_sorted = sorted(reallocation_options, key=lambda x: (-x[0], x[1]))
-                    if len(reallocation_options_sorted) > 0:  # the first options is chossed to be reallocated.
-                        if -1 * reallocation_options_sorted[0][0] < candidate[
-                            0]:  ## It makes sense to reallocate, since it gains in terms of fragmentation metric
-                            self._move(candidate[4], reallocation_options_sorted[0][1], candidate[2])
-                            num_moves += 1
-                            self.counted_moves += 1
-                    if num_moves > self.number_moves:
-                        break
-                if num_moves != 0:
-                    self.counted_defrag_cycles += 1
+                                    rss_diff = self.calculate_r_spatial(channel, links_indexes, True)
+                                    if rss_diff > 0:
+                                        defrag_candidates.append((rss_diff,
+                                                                  self.current_time - service.arrival_time, channel,
+                                                                  links_indexes, service))
+                    sorted_defrag_candidates = sorted(defrag_candidates, key=lambda x: (-x[0], -x[1]))
+                    num_moves = 0
+                    for i, candidate in enumerate(sorted_defrag_candidates):
+                        reallocation_options = []
+                        for channel_number in range(
+                                0, self.topology.graph["num_channel_resources"]
+                        ):
+                            if self.is_channel_free(candidate[4].path, channel_number):
+                                table_id = np.where(((self.connections_detail[:, 0] == int(candidate[4].source)) & (
+                                        self.connections_detail[:, 1] == int(candidate[4].destination))) | (
+                                                            (self.connections_detail[:, 0] == int(
+                                                                candidate[4].destination)) & (
+                                                                    self.connections_detail[:, 1] == int(
+                                                                candidate[4].source))))[0][0]
+                                for idp, serached_path in enumerate(
+                                        self.k_shortest_paths[
+                                            self.current_service.source, self.current_service.destination
+                                        ]
+                                ):
+                                    if serached_path == candidate[4].path:
+                                        break
+                                if self.modulation_level[table_id][channel_number][idp] == self.modulation_level[table_id][candidate[2]][idp]:
+                                    if self.metric == 'cut':
+                                        fragmentation_metric = self.calculate_r_cut(channel_number, candidate[3], False, candidate[4].path, True )
+                                    else:
+                                        fragmentation_metric = self.calculate_r_spatial(channel_number, candidate[3])
+                                    reallocation_options.append((fragmentation_metric, channel_number))
+                        reallocation_options_sorted = sorted(reallocation_options, key=lambda x: (-x[0], x[1]))
+                        if len(reallocation_options_sorted) > 0:  # the first options is chossed to be reallocated.
+                            if -1 * reallocation_options_sorted[0][0] < candidate[
+                                0]:  ## It makes sense to reallocate, since it gains in terms of fragmentation metric
+                                self._move(candidate[4], reallocation_options_sorted[0][1], candidate[2])
+                                num_moves += 1
+                                self.counted_moves += 1
+                        if num_moves + self.counted_moves_groom > self.number_moves:
+                            break
+                    if num_moves != 0:
+                        self.counted_defrag_cycles += 1
         return (
             self.observation(),
             reward,
@@ -448,6 +453,7 @@ class PhyRMSAEnv(OpticalNetworkEnv):
         self.total_path_index_episode = 0
         self.counted_defrag_cycles = 0
         self.counted_moves = 0
+        self.counted_moves_groom = 0
         self.total_gsnr_episode = 0
         self.total_modulation_level_episode = 0
         self.channels_accepted_episode = 0
@@ -745,6 +751,58 @@ class PhyRMSAEnv(OpticalNetworkEnv):
                 "running_services"
             ].append(service)
         self.topology.graph["running_services"].append(service)
+
+
+
+
+    # we use this function to groom services before defragmentation
+    def _groom_defragmentation(self):
+        grooming_moves = 0
+        for service in self.topology.graph["running_services"]:
+            for channel in service.channels:
+                if channel[1] != channel[3]:
+                    # result = next((tup for tup in self.channel_state[service.source_id,
+                    #                                                  service.destination_id,
+                    #                                                  service.path.idp] if tup[0] == channel[0]), None)
+                    corresponding_channel = [t for t in self.channel_state[
+                        service.source_id, service.destination_id, service.path.idp] if t[0] == channel[0]][0]
+                    if corresponding_channel[1] == channel[1]:  ###if used ones are the same, so we are eligible to do grooming,
+                # because it does not affect any other services, and it makes sense to reallocate this connection
+                        for target_channel in self.channel_state[service.source_id, service.destination_id, service.path.idp]:
+                            if target_channel != corresponding_channel:
+                                if target_channel[2] >= channel[1]: # I can do grooming, two channels are removed and one is added.
+                                    self.channel_state[
+                                        self.current_service.source_id, self.current_service.destination_id, service.path.idp].remove(
+                                        target_channel)
+                                    self.channel_state[
+                                        self.current_service.source_id, self.current_service.destination_id, service.path.idp].remove(
+                                        corresponding_channel)
+                                    updated_channel = (target_channel[0], target_channel[1] + channel[1], target_channel[2] - channel[1],target_channel[3])
+                                    self.channel_state[
+                                        self.current_service.source_id, self.current_service.destination_id, service.path.idp].append(updated_channel)
+                                    new_channel = (target_channel[0], channel[1], target_channel[2], target_channel[3], channel[4])
+                                    self._move_virtual(service, new_channel, old_channel)
+                                    grooming_moves += 1
+                                    break
+                if grooming_moves ==self.number_moves:
+                    return grooming_moves
+        return grooming_moves
+
+    def _move_virtual(self, service: Service, new_channel, old_channel):
+
+        for i in range(len(service.path.node_list) - 1):
+            self.topology[service.path.node_list[i]][service.path.node_list[i + 1]][
+                "running_services"
+            ].remove(service)
+        self.topology.graph["running_services"].remove(service)
+        service.channels.remove(old_channel)
+        service.channels.append(new_channel)
+        for i in range(len(service.path.node_list) - 1):
+            self.topology[service.path.node_list[i]][service.path.node_list[i + 1]][
+                "running_services"
+            ].append(service)
+        self.topology.graph["running_services"].append(service)
+
 
     def _service_acceptance(self, virtual: bool):
         self.current_service.virtual_layer = virtual
