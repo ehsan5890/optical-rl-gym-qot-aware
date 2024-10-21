@@ -48,8 +48,8 @@ modulation_us = us_data[0][0][1]
 gsnr_us = us_data[0][0][2]
 all_connections_us = us_data[0][0][0]
 
-min_load = 100
-max_load = 101
+min_load = 2200
+max_load = 2201
 step_length = 60
 steps = int((max_load - min_load)/step_length) +1
 
@@ -67,8 +67,8 @@ for load_counter, load in enumerate(range(min_load,max_load,step_length)):
         modulation_level=modulation_us,
         connections_detail=all_connections_us,
         gsnr=gsnr_us,
-        number_spectrum_channels=10,
-        number_spectrum_channels_s_band=10,
+        number_spectrum_channels=80,
+        number_spectrum_channels_s_band=108,
 
     )
 

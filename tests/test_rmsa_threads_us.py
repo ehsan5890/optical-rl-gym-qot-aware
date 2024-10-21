@@ -51,9 +51,9 @@ modulation_us = us_data[0][0][1]
 gsnr_us = us_data[0][0][2]
 all_connections_us = us_data[0][0][0]
 
-min_load = 80
-max_load = 181
-step_length = 20
+min_load = 1700
+max_load = 1701
+step_length = 80
 steps = int((max_load - min_load)/step_length) +1
 
 def run_with_callback(callback, env_args, num_eps, log_dir):
@@ -63,14 +63,14 @@ def run_with_callback(callback, env_args, num_eps, log_dir):
         env = Monitor(env, log_dir + 'BM-SA-FF', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
                                                                                                  'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
                                                                                                     'total_path_length', 'num_moves',
-                                                                'num_defrag_cycle', 'avrage_gsnr', 'average_mod_level', 'average_path_index','path_index','physical_paths'))
+                                                                'num_defrag_cycle', 'avrage_gsnr', 'average_mod_level', 'average_path_index','path_index','physical_paths','num_moves_groom'))
     elif callback is phy_aware_bmfa_rmsa:
         env = gym.make("PhyRMSA-v0", **env_args)
         env = Monitor(env, log_dir + 'BM-FA-Cut-modified', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
                                                                                                  'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
                                                                                                   'total_path_length',
                                                                                                     'num_moves',
-                                                                 'num_defrag_cycle','avrage_gsnr', 'average_mod_level', 'average_path_index', 'path_index','physical_paths'))
+                                                                 'num_defrag_cycle','avrage_gsnr', 'average_mod_level', 'average_path_index', 'path_index','physical_paths','num_moves_groom'))
 
     elif callback is phy_aware_sapbm_rmsa:
         env = gym.make("PhyRMSA-v0", **env_args)
@@ -78,13 +78,13 @@ def run_with_callback(callback, env_args, num_eps, log_dir):
                                                                                                  'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
                                                                                                   'total_path_length',
                                                                                                     'num_moves',
-                                                                 'num_defrag_cycle','avrage_gsnr', 'average_mod_level', 'average_path_index', 'path_index','physical_paths'))
+                                                                 'num_defrag_cycle','avrage_gsnr', 'average_mod_level', 'average_path_index', 'path_index','physical_paths','num_moves_groom'))
     else:
         env = gym.make("PhyRMSA-v0", **env_args)
         env = Monitor(env, log_dir + 'BM-FA-RSS', info_keywords=('episode_service_blocking_rate','service_blocking_rate',
                                                                                                  'episode_bit_rate_blocking_rate', 'number_cuts_total', 'rss_total_metric',
                                                                                                   'total_path_length',
-                                                                 'num_moves', 'num_defrag_cycle', 'avrage_gsnr', 'average_mod_level', 'average_path_index', 'path_index','physical_paths'))
+                                                                 'num_moves', 'num_defrag_cycle', 'avrage_gsnr', 'average_mod_level', 'average_path_index', 'path_index','physical_paths','num_moves_groom'))
 
     evaluate_heuristic(
         env, callback, n_eval_episodes=num_eps
@@ -136,27 +136,27 @@ if __name__ == '__main__':
         p.start()
         processes.append(p)
 
-        # env_args_defrag = dict(
-        #     topology=topology,
-        #     seed=10,
-        #     allow_rejection=True,
-        #     load=load,
-        #     mean_service_holding_time=25,
-        #     episode_length=episode_length,
-        #     num_spectrum_resources=64,
-        #     bit_rate_selection="discrete",
-        #     modulation_level=modulation_us,
-        #     connections_detail=all_connections_us,
-        #     gsnr=gsnr_us,
-        #     number_spectrum_channels=80,
-        #     number_spectrum_channels_s_band=108,
-        #     defrag_period=10,
-        #     number_moves=10,
+        env_args_defrag = dict(
+            topology=topology,
+            seed=10,
+            allow_rejection=True,
+            load=load,
+            mean_service_holding_time=25,
+            episode_length=episode_length,
+            num_spectrum_resources=64,
+            bit_rate_selection="discrete",
+            modulation_level=modulation_us,
+            connections_detail=all_connections_us,
+            gsnr=gsnr_us,
+            number_spectrum_channels=80,
+            number_spectrum_channels_s_band=108,
+            defrag_period=10,
+            number_moves=10,
+
+        )
         #
-        # )
-        # #
-        # log_dir = f'{logging_dir}/logs_{load}_{episode_length}-defragmeentation-cut/'
-        # os.makedirs(log_dir, exist_ok=True)
+        log_dir = f'{logging_dir}/logs_{load}_{episode_length}-defragmeentation-cut/'
+        os.makedirs(log_dir, exist_ok=True)
 
 
         # p = Process(target=run_with_callback, args=(phy_aware_sapff_rmsa, copy.deepcopy(env_args_defrag), episodes,log_dir))
@@ -167,10 +167,10 @@ if __name__ == '__main__':
         #
         #
         #
-        # p = Process(target=run_with_callback, args=(phy_aware_bmfa_rmsa, copy.deepcopy(env_args_defrag), episodes,log_dir))
-        # p.start()
-        # processes.append(p)
-        #
+        p = Process(target=run_with_callback, args=(phy_aware_bmfa_rmsa, copy.deepcopy(env_args_defrag), episodes,log_dir))
+        p.start()
+        processes.append(p)
+
         # env_args_defrag_rss = dict(
         #     topology=topology,
         #     seed=10,

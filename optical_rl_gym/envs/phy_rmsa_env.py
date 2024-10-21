@@ -9,6 +9,7 @@ from typing import Optional, Sequence, Tuple
 import gym
 import networkx as nx
 import numpy as np
+from pygame.display import update
 
 from optical_rl_gym.utils import Path, Service, Transponder
 
@@ -375,8 +376,8 @@ class PhyRMSAEnv(OpticalNetworkEnv):
         # Periodical defragmentation
         if self.defrag_period:
             if self.services_processed % self.defrag_period == 0:
-                self.counted_moves_groom = self.groom_defragmentation()
-                if self.counted_moves_groom >=self.number_moves:
+                self.counted_moves_groom = self._groom_defragmentation()
+                if self.counted_moves_groom <=self.number_moves:
                     defrag_candidates = []
                     ### there is no need to define a new channel class. go over running service, create the most good defragmentation options, then try to reallocate them.
                     for service in self.topology.graph["running_services"]:
@@ -385,19 +386,19 @@ class PhyRMSAEnv(OpticalNetworkEnv):
                             links_indexes.append(
                                 self.topology[service.path.node_list[i]][service.path.node_list[i + 1]]["index"])
                         for channel in service.channels:
-                            if channel[1] == channel[3]: ## we only reallocate full channels, the other ones propably i not appropriate to be reallocated
+                            if channel[1] == channel[3]: ## we only reallocate full channels, the other ones propably is not appropriate to be reallocated
                                 if self.metric == 'cut':
-                                    cut_diff = self.calculate_r_cut(channel, links_indexes, True, service.path, True)
+                                    cut_diff = self.calculate_r_cut(channel[0], links_indexes, True, service.path, True)
                                     if cut_diff > 0:
                                         defrag_candidates.append((cut_diff,
-                                                                  self.current_time - service.arrival_time, channel,
-                                                                  links_indexes, service))
+                                                                  self.current_time - service.arrival_time, channel[0],
+                                                                  links_indexes, service, channel))
                                 else:
-                                    rss_diff = self.calculate_r_spatial(channel, links_indexes, True)
+                                    rss_diff = self.calculate_r_spatial(channel[0], links_indexes, True)
                                     if rss_diff > 0:
                                         defrag_candidates.append((rss_diff,
-                                                                  self.current_time - service.arrival_time, channel,
-                                                                  links_indexes, service))
+                                                                  self.current_time - service.arrival_time, channel[0],
+                                                                  links_indexes, service, channel))
                     sorted_defrag_candidates = sorted(defrag_candidates, key=lambda x: (-x[0], -x[1]))
                     num_moves = 0
                     for i, candidate in enumerate(sorted_defrag_candidates):
@@ -429,7 +430,7 @@ class PhyRMSAEnv(OpticalNetworkEnv):
                         if len(reallocation_options_sorted) > 0:  # the first options is chossed to be reallocated.
                             if -1 * reallocation_options_sorted[0][0] < candidate[
                                 0]:  ## It makes sense to reallocate, since it gains in terms of fragmentation metric
-                                self._move(candidate[4], reallocation_options_sorted[0][1], candidate[2])
+                                self._move(candidate[4], reallocation_options_sorted[0][1], candidate[5])
                                 num_moves += 1
                                 self.counted_moves += 1
                         if num_moves + self.counted_moves_groom > self.number_moves:
@@ -716,35 +717,36 @@ class PhyRMSAEnv(OpticalNetworkEnv):
         # self._update_network_stats()
 
     ### we remove and add the running services for future use!
-    def _move(self, service: Service, new_channel, old_channel):
+    def _move(self, service: Service, new_channel_number, old_channel):
 
         for i in range(len(service.path.node_list) - 1):
             self.topology.graph["available_channels"][
                 self.topology[service.path.node_list[i]][service.path.node_list[i + 1]]["index"],
-                new_channel,
+                new_channel_number,
             ] = 0
             self.spectrum_channels_allocation[
                 self.topology[service.path.node_list[i]][service.path.node_list[i + 1]]["index"],
-                new_channel,
+                new_channel_number,
             ] = service.service_id
 
             self.topology.graph["available_channels"][
                 self.topology[service.path.node_list[i]][service.path.node_list[i + 1]][
                     "index"
                 ],
-                old_channel,
+                old_channel[0],
             ] = 1
             self.spectrum_channels_allocation[
                 self.topology[service.path.node_list[i]][service.path.node_list[i + 1]][
                     "index"
                 ],
-                old_channel,
+                old_channel[0],
             ] = -1
             self.topology[service.path.node_list[i]][service.path.node_list[i + 1]][
                 "running_services"
             ].remove(service)
         self.topology.graph["running_services"].remove(service)
         service.channels.remove(old_channel)
+        new_channel = (new_channel_number, old_channel[1], old_channel[2], old_channel[3], old_channel[4])
         service.channels.append(new_channel)
         for i in range(len(service.path.node_list) - 1):
             self.topology[service.path.node_list[i]][service.path.node_list[i + 1]][
@@ -767,21 +769,21 @@ class PhyRMSAEnv(OpticalNetworkEnv):
                     corresponding_channel = [t for t in self.channel_state[
                         service.source_id, service.destination_id, service.path.idp] if t[0] == channel[0]][0]
                     if corresponding_channel[1] == channel[1]:  ###if used ones are the same, so we are eligible to do grooming,
-                # because it does not affect any other services, and it makes sense to reallocate this connection
+                # because it does not affect any other services, and it makes sense to reallocate this connection. this is very important point.
                         for target_channel in self.channel_state[service.source_id, service.destination_id, service.path.idp]:
                             if target_channel != corresponding_channel:
                                 if target_channel[2] >= channel[1]: # I can do grooming, two channels are removed and one is added.
                                     self.channel_state[
-                                        self.current_service.source_id, self.current_service.destination_id, service.path.idp].remove(
+                                        service.source_id, service.destination_id, service.path.idp].remove(
                                         target_channel)
                                     self.channel_state[
-                                        self.current_service.source_id, self.current_service.destination_id, service.path.idp].remove(
+                                        service.source_id, service.destination_id, service.path.idp].remove(
                                         corresponding_channel)
                                     updated_channel = (target_channel[0], target_channel[1] + channel[1], target_channel[2] - channel[1],target_channel[3])
                                     self.channel_state[
-                                        self.current_service.source_id, self.current_service.destination_id, service.path.idp].append(updated_channel)
-                                    new_channel = (target_channel[0], channel[1], target_channel[2], target_channel[3], channel[4])
-                                    self._move_virtual(service, new_channel, old_channel)
+                                        service.source_id, service.destination_id, service.path.idp].append(updated_channel)
+                                    new_channel = (target_channel[0], channel[1], updated_channel[2], target_channel[3], True)
+                                    self._move_virtual(service, new_channel, channel)
                                     grooming_moves += 1
                                     break
                 if grooming_moves ==self.number_moves:
@@ -790,17 +792,33 @@ class PhyRMSAEnv(OpticalNetworkEnv):
 
     def _move_virtual(self, service: Service, new_channel, old_channel):
 
+        # for i in range(len(service.path.node_list) - 1):
+        #     self.topology[service.path.node_list[i]][service.path.node_list[i + 1]][
+        #         "running_services"
+        #     ].remove(service)
         for i in range(len(service.path.node_list) - 1):
-            self.topology[service.path.node_list[i]][service.path.node_list[i + 1]][
-                "running_services"
-            ].remove(service)
+            self.topology.graph["available_channels"][
+                self.topology[service.path.node_list[i]][service.path.node_list[i + 1]][
+                    "index"
+                ],
+                old_channel[0],
+            ] = 1
+            self.spectrum_channels_allocation[
+                self.topology[service.path.node_list[i]][service.path.node_list[i + 1]][
+                    "index"
+                ],
+                old_channel[0],
+            ] = -1
+            # self.topology[service.path.node_list[i]][service.path.node_list[i + 1]][
+            #     "running_services"
+            # ].remove(service)
         self.topology.graph["running_services"].remove(service)
         service.channels.remove(old_channel)
-        service.channels.append(new_channel)
-        for i in range(len(service.path.node_list) - 1):
-            self.topology[service.path.node_list[i]][service.path.node_list[i + 1]][
-                "running_services"
-            ].append(service)
+        service.channels.append(new_channel) ### the channel of the service got changed
+        # for i in range(len(service.path.node_list) - 1):
+        #     self.topology[service.path.node_list[i]][service.path.node_list[i + 1]][
+        #         "running_services"
+        #     ].append(service)
         self.topology.graph["running_services"].append(service)
 
 
