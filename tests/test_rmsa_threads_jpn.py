@@ -53,9 +53,9 @@ modulation_jpn12 = jpn_data[0][0][1]
 gsnr_jpn12 = jpn_data[0][0][2]
 all_connections_jpn12 = jpn_data[0][0][0]
 
-min_load = 900
-max_load = 1501
-step_length = 100
+min_load = 960
+max_load = 1361
+step_length = 60
 steps = int((max_load - min_load) / step_length) + 1
 
 
@@ -164,15 +164,6 @@ if __name__ == '__main__':
 
         os.makedirs(log_dir, exist_ok=True)
         #
-        #
-        # p = Process(target=run_with_callback, args=(phy_aware_sapff_rmsa, copy.deepcopy(env_args_defrag), episodes,log_dir))
-        # p.start()
-        # processes.append(p)
-        #
-        #
-        #
-        #
-        #
         p = Process(target=run_with_callback, args=(phy_aware_bmfa_rmsa, copy.deepcopy(env_args_defrag), episodes,log_dir))
         p.start()
         processes.append(p)
@@ -197,13 +188,13 @@ if __name__ == '__main__':
 
         )
         #
-        # log_dir = f'{logging_dir}/logs_{load}_{episode_length}-defragmeentation-rss/'
-        # os.makedirs(log_dir, exist_ok=True)
-        #
-        # p = Process(target=run_with_callback,
-        #             args=(phy_aware_bmfa_rss_rmsa, copy.deepcopy(env_args_defrag_rss), episodes, log_dir))
-        # p.start()
-        # processes.append(p)
+        log_dir = f'{logging_dir}/logs_{load}_{episode_length}-defragmeentation-rss/'
+        os.makedirs(log_dir, exist_ok=True)
+
+        p = Process(target=run_with_callback,
+                    args=(phy_aware_bmfa_rss_rmsa, copy.deepcopy(env_args_defrag_rss), episodes, log_dir))
+        p.start()
+        processes.append(p)
         #
         # p = Process(target=run_with_callback,
         #             args=(phy_aware_bmff_rmsa, copy.deepcopy(env_args_defrag_rss), episodes, log_dir))

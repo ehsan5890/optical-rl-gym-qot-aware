@@ -9,7 +9,7 @@ from typing import Optional, Sequence, Tuple
 import gym
 import networkx as nx
 import numpy as np
-from pygame.display import update
+#from pygame.display import update
 
 from optical_rl_gym.utils import Path, Service, Transponder
 
@@ -359,7 +359,7 @@ class PhyRMSAEnv(OpticalNetworkEnv):
             # "L_BVTs": np.sum(self.bvts[0]) / (self.services_accepted + 1),
             # "S_BVTs": np.sum(self.bvts[2]) / (self.services_accepted + 1),
             "total_path_length": self.total_path_length_episode/( self.physical_services_accepted_episode + 1),
-            "num_moves": self.counted_moves,
+            "num_moves": self.counted_moves/2 + self.counted_moves_groom,
             "num_moves_groom": self.counted_moves_groom,
             "num_defrag_cycle": self.counted_defrag_cycles,
             "avrage_gsnr": self.total_gsnr_episode/(self.channels_accepted_episode + 1),
@@ -371,7 +371,7 @@ class PhyRMSAEnv(OpticalNetworkEnv):
 
         self._new_service = False
         self._next_service()
-        if self.episode_services_processed == 12000:
+        if self.episode_services_processed == 30000:
             a = 1
         # Periodical defragmentation
         if self.defrag_period:
@@ -861,7 +861,7 @@ class PhyRMSAEnv(OpticalNetworkEnv):
                     ] = -1
             # self.topology[service.path.node_list[i]][service.path.node_list[i + 1]][
             #             "running_services"
-            #         ].remove(service)
+            #         ].remove(service)        ####3 this part prbably should be added
 
         for channel in service.channels:
             if channel[1] != channel[3]:
