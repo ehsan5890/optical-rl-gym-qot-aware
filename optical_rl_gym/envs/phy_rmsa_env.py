@@ -153,15 +153,6 @@ class PhyRMSAEnv(OpticalNetworkEnv):
             (3, self.topology.number_of_nodes(), self.topology.number_of_nodes()), dtype=int
         )
 
-        # self.c_bvt = [[[] for _ in range(self.topology.number_of_nodes())] for _ in range(self.topology.number_of_nodes())]
-        # self.c_bvt_free = [[] for _ in range(self.topology.number_of_nodes())]
-        #
-        # self.s_bvt = [[[] for _ in range(self.topology.number_of_nodes())] for _ in range(self.topology.number_of_nodes())]
-        # self.s_bvt_free = [[] for _ in range(self.topology.number_of_nodes())]
-        #
-        # self.l_bvt = [[[] for _ in range(self.topology.number_of_nodes())] for _ in range(self.topology.number_of_nodes())]
-        # self.l_bvt_free = [[] for _ in range(self.topology.number_of_nodes())]
-
         self.channel_state = np.empty((self.topology.number_of_nodes(), self.topology.number_of_nodes(), self.k_paths), dtype=object)
         for i in range(self.topology.number_of_nodes()):
             for j in range(self.topology.number_of_nodes()):
@@ -316,21 +307,6 @@ class PhyRMSAEnv(OpticalNetworkEnv):
             self._add_release(self.current_service)
         self.topology.graph["services"].append(self.current_service)
 
-        # generating statistics for the episode info
-        # if self.bit_rate_selection == "discrete":
-        #     blocking_per_bit_rate = {}
-        #     for bit_rate in self.bit_rates:
-        #         if self.bit_rate_requested_histogram[bit_rate] > 0:
-        #             # computing the blocking rate per bit rate requested in the increasing order of bit rate
-        #             blocking_per_bit_rate[bit_rate] = (
-        #                                                       self.bit_rate_requested_histogram[bit_rate]
-        #                                                       - self.bit_rate_provisioned_histogram[bit_rate]
-        #                                               ) / self.bit_rate_requested_histogram[bit_rate]
-        #         else:
-        #             blocking_per_bit_rate[bit_rate] = 0.0
-        # cur_network_compactness = (
-        #     self._get_network_compactness()
-        # )  # measuring compactness after the provisioning
 
         self.number_cuts = self._calculate_total_cuts()
         self.rss_total_metric = self.calculate_total_r_spatial()
@@ -612,42 +588,6 @@ class PhyRMSAEnv(OpticalNetworkEnv):
             self.topology[path.node_list[i]][path.node_list[i + 1]][
                 "running_services"
             ].append(self.current_service)
-            # self._update_link_stats(path.node_list[i], path.node_list[i + 1])
-        tmp_modulation_level_total = 0 ## this variable is created to see how much left for the final transponder.
-        # there are smarter ways to handle it, but i did not want to change the whole code.
-        # for i, channel in enumerate(channels):
-        #     mod_level = self.modulation_level[table_id][channel][idp]
-        #     gsnr = self.gsnr[table_id][channel][idp]
-        #     self.total_gsnr_episode += gsnr
-        #     self.total_modulation_level_episode += mod_level
-        #     self.channels_accepted_episode += 1
-        #     if i != len(channels) - 1 or (len(channels)==1 and self.current_service.bit_rate == mod_level):
-        #         tmp_modulation_level_total +=mod_level
-        #         channels_detail.append((channel, mod_level, 0, mod_level))
-        #         if channel <= self.num_spectrum_channels:
-        #             self.bvts[1][self.current_service.source_id][self.current_service.destination_id] += 1
-        #             # self.c_bvt[self.current_service.source_id][self.current_service.destination_id].append(Transponder(mod_level*100, 0, False))
-        #         elif self.num_spectrum_channels < channel <= 2 * self.num_spectrum_channels:
-        #             self.bvts[0][self.current_service.source_id][self.current_service.destination_id] += 1
-        #             # self.l_bvt[self.current_service.source_id][self.current_service.destination_id].append(Transponder(mod_level * 100, 0, False))
-        #         elif 2 * self.num_spectrum_channels < channel < 2 * self.num_spectrum_channels + self.number_spectrum_channels_s_band:
-        #             self.bvts[2][self.current_service.source_id][self.current_service.destination_id] += 1
-        #             # self.s_bvt[self.current_service.source_id][self.current_service.destination_id].append(Transponder(mod_level * 100, 0, False))
-        #
-        #     else:
-        #         remained_data = self.current_service.bit_rate - 100*tmp_modulation_level_total
-        #         self.channel_state[self.current_service.source_id, self.current_service.destination_id, idp].append((channel, remained_data/100,  mod_level - (remained_data/100), mod_level))
-        #         channels_detail.append((channel, remained_data/100, mod_level - (remained_data/100), mod_level))
-        #         if channel <= self.num_spectrum_channels:
-        #             self.bvts[1][self.current_service.source_id][self.current_service.destination_id] += 1
-        #             # self.c_bvt[self.current_service.source_id][self.current_service.destination_id].append(Transponder(mod_level*100, mod_level*100- remained_data, False))
-        #         elif self.num_spectrum_channels < channel <= 2 * self.num_spectrum_channels:
-        #             self.bvts[0][self.current_service.source_id][self.current_service.destination_id] += 1
-        #             # self.l_bvt[self.current_service.source_id][self.current_service.destination_id].append(Transponder(mod_level * 100, mod_level*100- remained_data, False))
-        #         elif 2 * self.num_spectrum_channels < channel < 2 * self.num_spectrum_channels + self.number_spectrum_channels_s_band:
-        #             self.bvts[2][self.current_service.source_id][self.current_service.destination_id] += 1
-        #             # self.s_bvt[self.current_service.source_id][self.current_service.destination_id].append(Transponder(mod_level * 100, mod_level*100- remained_data, False))
-
 
         for i, channel in enumerate(channels):
             mod_level = channel[3]
@@ -835,13 +775,6 @@ class PhyRMSAEnv(OpticalNetworkEnv):
         self.bit_rate_provisioned += self.current_service.bit_rate
         self.episode_bit_rate_provisioned += self.current_service.bit_rate
 
-        # if (
-        #         self.bit_rate_selection == "discrete"
-        # ):  # if bit rate selection is discrete, populate the histograms
-        #     self.bit_rate_provisioned_histogram[self.current_service.bit_rate] += 1
-        #     self.episode_bit_rate_provisioned_histogram[
-        #         self.current_service.bit_rate
-        #     ] += 1
 
     def _release_path(self, service: Service):
         for i in range(len(service.path.node_list) - 1):
@@ -924,14 +857,6 @@ class PhyRMSAEnv(OpticalNetworkEnv):
             # )
 
         self.topology.graph["running_services"].remove(service)
-
-        # for channel in service.channels:
-        #     if channel <= self.num_spectrum_channels:
-        #         self.bvts[1][self.current_service.source_id][self.current_service.destination_id] -= 1
-        #     elif self.num_spectrum_channels < channel <= 2 * self.num_spectrum_channels:
-        #         self.bvts[0][self.current_service.source_id][self.current_service.destination_id] -= 1
-        #     elif 2 * self.num_spectrum_channels < channel < 2 * self.num_spectrum_channels + self.number_spectrum_channels_s_band:
-        #         self.bvts[2][self.current_service.source_id][self.current_service.destination_id] = 1
 
     def _update_network_stats(self):
         last_update = self.topology.graph["last_update"]
@@ -1322,45 +1247,6 @@ class PhyRMSAEnv(OpticalNetworkEnv):
 
         return cur_spectrum_compactness
 
-
-# def phy_aware_sapff_rmsa(env: PhyRMSAEnv) -> Tuple[int, list]:
-#     # first to check if we have enough resource in virtual layer
-#     # TODO: this is not the best way to handle the grroming layer. For example, if grooming layer has 300 Gbps, and service is 500 Gbps, then 300 can be used!
-#     if env.grooming_layer[env.current_service.source_id][
-#         env.current_service.destination_id] >= env.current_service.bit_rate:
-#         env.grooming_layer[env.current_service.source_id][
-#             env.current_service.destination_id] -= env.current_service.bit_rate
-#         return (-1, [])  # No need to establish a new service, and -1 means service is established over IP layer
-#     else:
-#         unassigned_bitrate = env.current_service.bit_rate
-#         selected_channels = []
-#         table_id = np.where(((env.connections_detail[:, 0] == int(env.current_service.source)) & (
-#                     env.connections_detail[:, 1] == int(env.current_service.destination))) | (
-#                                     (env.connections_detail[:, 0] == int(env.current_service.destination)) & (
-#                                         env.connections_detail[:, 1] == int(env.current_service.source))))[0][0]
-#
-#         ## this could be the Shortest available path first fit solution.
-#         for idp, path in enumerate(
-#                 env.k_shortest_paths[
-#                     env.current_service.source, env.current_service.destination
-#                 ]
-#         ):
-#             for channel_number in range(
-#                     0, env.topology.graph["num_channel_resources"]
-#             ):
-#                 if env.is_channel_free(path, channel_number):
-#                     mod_level = env.modulation_level[table_id][channel_number][idp]
-#                     selected_channels.append(channel_number)
-#                     unassigned_bitrate -= mod_level * 100
-#                     if unassigned_bitrate <= 0:
-#                         env.grooming_layer[env.current_service.source_id][
-#                             env.current_service.destination_id] -= unassigned_bitrate
-#                         return (idp, selected_channels)
-#
-#             selected_channels = []
-#             unassigned_bitrate = env.current_service.bit_rate
-#
-#         return (-2, [])  # -2 means service is blocked
 
 
 def phy_aware_sapbm_rmsa(env: PhyRMSAEnv) -> Tuple[int, list]:
