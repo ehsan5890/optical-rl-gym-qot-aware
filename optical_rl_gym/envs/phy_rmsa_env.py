@@ -1564,6 +1564,70 @@ def phy_aware_faff_rmsa(env: PhyRMSAEnv) -> Tuple[int, list]:
                     return (-2, [])
         return (-2, [])
 
+
+def phy_aware_faff_rss_rmsa(env: PhyRMSAEnv) -> Tuple[int, list]:
+    # first to check if we have enough resource in virtual layer
+    result = use_existing_channels(env)
+    if result[0] != -3:
+        return (result[0] + 20, result[1])
+    else:
+        table_id = np.where(((env.connections_detail[:, 0] == int(env.current_service.source)) & (
+                    env.connections_detail[:, 1] == int(env.current_service.destination))) | (
+                                    (env.connections_detail[:, 0] == int(env.current_service.destination)) & (
+                                        env.connections_detail[:, 1] == int(env.current_service.source))))[0][0]
+        free_channels = [[] for _ in range(env.k_paths)]
+
+        ## this could be the Shortest available path first fit solution.
+        for idp, path in enumerate(
+                env.k_shortest_paths[
+                    env.current_service.source, env.current_service.destination
+                ]
+        ):
+            for channel_number in range(
+                    0, env.topology.graph["num_channel_resources"]
+            ):
+                if env.is_channel_free(path, channel_number):
+                    mod_level = env.modulation_level[table_id][channel_number][idp]
+                    links_index = []
+                    for i in range(len(path.node_list) - 1):
+                        links_index.append(env.topology[path.node_list[i]][path.node_list[i + 1]]["index"])
+                    fragmentation_metric = env.calculate_r_spatial(channel_number, links_index)
+                    free_channels[idp].append((mod_level, fragmentation_metric, channel_number, idp))
+
+        # sorted_free_channels = [sorted(row, key=lambda x: (-x[0], -x[1])) for row in free_channels]  ## this is for bmfa
+        sorted_free_channels = [sorted(row, key=lambda x: (-x[1])) for row in free_channels]  ## this is for fabm
+
+        while True:
+            max_modulation_level = float('-inf')
+            max_frag_metric = float('-inf')
+            max_modulation_row_index = None
+            unassigned_bitrate = env.current_service.bit_rate
+            selected_channels = []
+            for i, row in enumerate(sorted_free_channels):
+                # Check if the modulation level of the first tuple in the row is greater than or equal to the current maximum
+                if row != [] and (row[0][1] > max_frag_metric):  # it was i < max_modulation_row_index
+                    max_modulation_level = row[0][0]
+                    max_frag_metric = row[0][1]
+                    max_modulation_row_index = i
+
+            if max_modulation_row_index is None:
+                return (-2, [])
+            else:
+                for channel in sorted_free_channels[max_modulation_row_index]:
+                    unassigned_bitrate -= int(channel[0]) * 100
+                    if unassigned_bitrate <= 0:
+                        selected_channels.append((channel[2], channel[0] + unassigned_bitrate / 100,
+                                                  unassigned_bitrate / -100, channel[0], False))
+                        return (channel[3], selected_channels)
+                    else:
+                        selected_channels.append((channel[2], channel[0], 0, channel[0], False))
+
+                if len(sorted_free_channels) > max_modulation_row_index:
+                    sorted_free_channels.pop(max_modulation_row_index)
+                elif len(sorted_free_channels) == 0:
+                    return (-2, [])
+        return (-2, [])
+
 # def shortest_available_path_first_fit(env: PhyRMSAEnv) -> Tuple[int, int]:
 #     for idp, path in enumerate(
 #             env.k_shortest_paths[
@@ -1603,3 +1667,36 @@ def use_existing_channels(env:PhyRMSAEnv) -> Tuple:
                         selected_channels.append((candidate_channel[0], candidate_channel[2], 0, candidate_channel[3], True))
 
     return (-3, [])
+
+def sapff_rmsa(env: PhyRMSAEnv) -> Tuple[int, list]:
+    # First check if existing virtual channel can serve the request
+    result = use_existing_channels(env)
+    if result[0] != -3:
+        return (result[0] + 20, result[1])
+
+    unassigned_bitrate = env.current_service.bit_rate
+    table_id = np.where(
+        ((env.connections_detail[:, 0] == int(env.current_service.source)) &
+         (env.connections_detail[:, 1] == int(env.current_service.destination))) |
+        ((env.connections_detail[:, 0] == int(env.current_service.destination)) &
+         (env.connections_detail[:, 1] == int(env.current_service.source)))
+    )[0][0]
+
+    # Iterate over shortest paths (in order)
+    for idp, path in enumerate(env.k_shortest_paths[env.current_service.source, env.current_service.destination]):
+        selected_channels = []
+        remaining_bitrate = unassigned_bitrate
+        for channel_number in range(env.topology.graph["num_channel_resources"]):
+            if env.is_channel_free(path, channel_number):
+                # Use modulation level only to calculate channel capacity
+                mod_level = env.modulation_level[table_id][channel_number][idp]
+                channel_capacity = mod_level * 100
+                remaining_bitrate -= channel_capacity
+                if remaining_bitrate <= 0:
+                    selected_channels.append((channel_number, channel_capacity + remaining_bitrate, -remaining_bitrate / 100, mod_level, False))
+                    return (idp, selected_channels)
+                else:
+                    selected_channels.append((channel_number, channel_capacity, 0, mod_level, False))
+
+        # If current path doesn't satisfy bitrate, continue to next
+    return (-2, [])  # -2 means blocking
