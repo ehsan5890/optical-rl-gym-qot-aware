@@ -25,7 +25,7 @@ import copy
 
 seed = 20
 episodes = 1000
-episode_length = 205
+episode_length = 200
 
 monitor_files = []
 policies = []
@@ -102,7 +102,7 @@ def run_with_callback(callback, env_args, num_eps, log_dir):
                                      'path_index', 'physical_paths','num_moves_groom'))
 
 
-    elif callback is sapff_rmsa:
+    elif callback is phy_aware_faff_rss_rmsa:
         env = gym.make("PhyRMSA-v0", **env_args)
         env = Monitor(env, log_dir + 'FA-FF-RSS',
                       info_keywords=('episode_service_blocking_rate', 'service_blocking_rate',
@@ -111,7 +111,7 @@ def run_with_callback(callback, env_args, num_eps, log_dir):
                                      'num_moves',
                                      'num_defrag_cycle', 'avrage_gsnr', 'average_mod_level', 'average_path_index',
                                      'path_index', 'physical_paths','num_moves_groom'))
-    elif callback is phy_aware_faff_rss_rmsa:
+    elif callback is sapff_rmsa:
         env = gym.make("PhyRMSA-v0", **env_args)
         env = Monitor(env, log_dir + 'sap-FF',
                       info_keywords=('episode_service_blocking_rate', 'service_blocking_rate',
@@ -178,9 +178,9 @@ if __name__ == '__main__':
         # p.start()
         # processes.append(p)
 
-        p = Process(target=run_with_callback, args=(phy_aware_faff_rss_rmsa, copy.deepcopy(env_args), episodes,log_dir))
-        p.start()
-        processes.append(p)
+        # p = Process(target=run_with_callback, args=(phy_aware_faff_rss_rmsa, copy.deepcopy(env_args), episodes,log_dir))
+        # p.start()
+        # processes.append(p)
 
         p = Process(target=run_with_callback, args=(sapff_rmsa, copy.deepcopy(env_args), episodes,log_dir))
         p.start()

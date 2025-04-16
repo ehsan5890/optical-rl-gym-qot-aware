@@ -1668,35 +1668,67 @@ def use_existing_channels(env:PhyRMSAEnv) -> Tuple:
 
     return (-3, [])
 
+
 def sapff_rmsa(env: PhyRMSAEnv) -> Tuple[int, list]:
-    # First check if existing virtual channel can serve the request
+    # first to check if we have enough resource in virtual layer
     result = use_existing_channels(env)
     if result[0] != -3:
         return (result[0] + 20, result[1])
-
-    unassigned_bitrate = env.current_service.bit_rate
-    table_id = np.where(
-        ((env.connections_detail[:, 0] == int(env.current_service.source)) &
-         (env.connections_detail[:, 1] == int(env.current_service.destination))) |
-        ((env.connections_detail[:, 0] == int(env.current_service.destination)) &
-         (env.connections_detail[:, 1] == int(env.current_service.source)))
-    )[0][0]
-
-    # Iterate over shortest paths (in order)
-    for idp, path in enumerate(env.k_shortest_paths[env.current_service.source, env.current_service.destination]):
+    else:
+        unassigned_bitrate = env.current_service.bit_rate
         selected_channels = []
-        remaining_bitrate = unassigned_bitrate
-        for channel_number in range(env.topology.graph["num_channel_resources"]):
-            if env.is_channel_free(path, channel_number):
-                # Use modulation level only to calculate channel capacity
-                mod_level = env.modulation_level[table_id][channel_number][idp]
-                channel_capacity = mod_level * 100
-                remaining_bitrate -= channel_capacity
-                if remaining_bitrate <= 0:
-                    selected_channels.append((channel_number, channel_capacity + remaining_bitrate, -remaining_bitrate / 100, mod_level, False))
-                    return (idp, selected_channels)
-                else:
-                    selected_channels.append((channel_number, channel_capacity, 0, mod_level, False))
+        # free_channels = []
+        table_id = np.where(((env.connections_detail[:, 0] == int(env.current_service.source)) & (
+                env.connections_detail[:, 1] == int(env.current_service.destination))) | (
+                                    (env.connections_detail[:, 0] == int(env.current_service.destination)) & (
+                                    env.connections_detail[:, 1] == int(env.current_service.source))))[0][0]
+        free_channels = [[] for _ in range(env.k_paths)]
 
-        # If current path doesn't satisfy bitrate, continue to next
-    return (-2, [])  # -2 means blocking
+        ## this could be the Shortest available path first fit solution.
+        for idp, path in enumerate(
+                env.k_shortest_paths[
+                    env.current_service.source, env.current_service.destination
+                ]
+        ):
+            for channel_number in range(
+                    0, env.topology.graph["num_channel_resources"]
+            ):
+                if env.is_channel_free(path, channel_number):
+                    mod_level = env.modulation_level[table_id][channel_number][idp]
+                    free_channels[idp].append((mod_level, channel_number, idp))
+
+        sorted_free_channels = [sorted(row, key=lambda x: (x[1])) for row in free_channels]
+
+        while True:
+            max_modulation_level = float('-inf')
+            max_modulation_row_index = None
+            unassigned_bitrate = env.current_service.bit_rate
+            selected_channels = []
+            for i in range(len(sorted_free_channels) - 1, -1, -1):
+                # Check if the modulation level of the first tuple in the row is greater than or equal to the current maximum
+                if sorted_free_channels[i] == []:
+                    sorted_free_channels.pop(i)
+
+            if len(sorted_free_channels) > 0:
+                max_modulation_row_index = 0
+                try:
+                    max_modulation_level = sorted_free_channels[0][0][0]
+                except:
+                    aaa = 1
+            if max_modulation_row_index is None:
+                return (-2, [])
+            else:
+                for channel in sorted_free_channels[max_modulation_row_index]:
+                    unassigned_bitrate -= int(channel[0]) * 100
+                    if unassigned_bitrate <= 0:
+                        selected_channels.append((channel[1], channel[0] + unassigned_bitrate / 100,
+                                                  unassigned_bitrate / -100, channel[0], False))
+                        return (channel[2], selected_channels)
+                    else:
+                        selected_channels.append((channel[1], channel[0], 0, channel[0], False))
+                if len(sorted_free_channels) > max_modulation_row_index:
+                    sorted_free_channels.pop(max_modulation_row_index)
+                elif len(sorted_free_channels) == 0:
+                    return (-2, [])
+        return (-2, [])  # -2 means service is blocked
+
