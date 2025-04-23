@@ -54,6 +54,7 @@ class PhyRMSAEnv(OpticalNetworkEnv):
             defrag_period=None,
             number_moves=None,
             metric='cut',
+            grooming = True,
     ):
         super().__init__(
             topology,
@@ -95,6 +96,7 @@ class PhyRMSAEnv(OpticalNetworkEnv):
         self.defrag_period = defrag_period
         self.number_moves = number_moves
         self.metric = metric
+        self.grooming = grooming
 
         self.number_cuts = 0
         self.rss_total_metric = 0
@@ -1372,8 +1374,9 @@ def phy_aware_bmff_rmsa(env: PhyRMSAEnv) -> Tuple[int, list]:
 
 def phy_aware_bmfa_rmsa(env: PhyRMSAEnv) -> Tuple[int, list]:
     # first to check if we have enough resource in virtual layer
-    result = use_existing_channels(env)
-    if result[0] != -3:
+    if env.grooming:
+        result = use_existing_channels(env)
+    if env.grooming and result[0] != -3:
         return (result[0] + 20, result[1])
     else:
         table_id = np.where(((env.connections_detail[:, 0] == int(env.current_service.source)) & (
@@ -1437,8 +1440,9 @@ def phy_aware_bmfa_rmsa(env: PhyRMSAEnv) -> Tuple[int, list]:
 
 def phy_aware_bmfa_rss_rmsa(env: PhyRMSAEnv) -> Tuple[int, list]:
     # first to check if we have enough resource in virtual layer
-    result = use_existing_channels(env)
-    if result[0] != -3:
+    if env.grooming:
+        result = use_existing_channels(env)
+    if env.grooming and result[0] != -3:
         return (result[0] + 20, result[1])
     else:
         table_id = np.where(((env.connections_detail[:, 0] == int(env.current_service.source)) & (
